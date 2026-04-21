@@ -1,0 +1,14 @@
+{
+  "domain": "rubiks",
+  "name": "Rubiks Cube Scanner",
+  "codeowners": [
+    "@OkhammahkO"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/OkhammahkO/rubiks",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/OkhammahkO/rubiks/issues",
+  "requirements": ["Pillow>=10.0.0"],
+  "version": "0.1.0"
+}

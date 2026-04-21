@@ -1,0 +1,9 @@
+# Test dependencies for Rubiks integration
+pytest>=7.4.0
+pytest-homeassistant-custom-component>=0.13.110,<0.13.206
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+
+# Code quality
+ruff>=0.7.0
+mypy>=1.13.0

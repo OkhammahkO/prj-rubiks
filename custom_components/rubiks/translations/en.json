@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Rubiks Cube Scanner",
+        "description": "Choose an image source for scanning cube faces.",
+        "data": {
+          "source": "Image source"
+        }
+      },
+      "camera": {
+        "title": "Select Camera",
+        "description": "Select the ESPHome camera entity to use for scanning.",
+        "data": {
+          "camera_entity": "Camera entity"
+        }
+      },
+      "sample": {
+        "title": "Sample Image",
+        "description": "Enter the path to a sample image file for testing.",
+        "data": {
+          "sample_image": "Image file path"
+        }
+      }
+    },
+    "error": {
+      "invalid_image": "Could not read the image file. Check the path.",
+      "camera_unavailable": "Camera entity is unavailable."
+    },
+    "abort": {
+      "already_configured": "Device is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "cube_state": {
+        "name": "Cube State"
+      },
+      "current_face": {
+        "name": "Current Face"
+      },
+      "faces_scanned": {
+        "name": "Faces Scanned"
+      }
+    },
+    "button": {
+      "scan_face": {
+        "name": "Scan Face"
+      },
+      "reset_scan": {
+        "name": "Reset Scan"
+      }
+    }
+  }
+}
