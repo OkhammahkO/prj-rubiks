@@ -3,24 +3,26 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .camera_processor import (
+    CropBox,
+    detect_face_colors,
+    load_image_from_bytes,
+    load_image_from_path,
+)
 from .const import (
+    ANNOTATED_IMAGE_PATH,
     CONF_CAMERA_ENTITY,
     CONF_SAMPLE_IMAGE,
     CONF_SOURCE,
     DOMAIN,
-    FACES,
     SOURCE_CAMERA,
-)
-from .camera_processor import (
-    detect_face_colors,
-    load_image_from_bytes,
-    load_image_from_path,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,11 +60,12 @@ class ScanFaceButton(ButtonEntity):
         data = self.hass.data[DOMAIN][self._entry.entry_id]
         scanned: dict = data["scanned_faces"]
 
-        # Determine the next face to scan
-        next_face = next((f for f in FACES if f not in scanned), None)
-        if next_face is None:
+        if len(scanned) >= 6:
             _LOGGER.warning("All 6 faces already scanned. Reset before scanning again.")
             return
+
+        # Read crop box from number entities
+        crop_box: CropBox | None = self._get_crop_box(data)
 
         # Load image
         source = self._entry.data[CONF_SOURCE]
@@ -70,7 +73,7 @@ class ScanFaceButton(ButtonEntity):
             if source == SOURCE_CAMERA:
                 camera_entity_id = self._entry.data[CONF_CAMERA_ENTITY]
                 image_bytes = await self._get_camera_snapshot(camera_entity_id)
-                image = load_image_from_bytes(image_bytes)
+                image = await self.hass.async_add_executor_job(load_image_from_bytes, image_bytes)
             else:
                 path = self._entry.data[CONF_SAMPLE_IMAGE]
                 image = await self.hass.async_add_executor_job(load_image_from_path, path)
@@ -78,13 +81,73 @@ class ScanFaceButton(ButtonEntity):
             _LOGGER.exception("Failed to load image for face scan")
             return
 
-        # Detect colors (run in executor — Pillow is not async)
-        colors = await self.hass.async_add_executor_job(detect_face_colors, image)
-        scanned[next_face] = colors
-        _LOGGER.info("Scanned face %s: %s", next_face, colors)
+        # Detect colors (Pillow is not async)
+        scan = await self.hass.async_add_executor_job(detect_face_colors, image, crop_box)
 
-        # Fire event so sensors update
-        self.hass.bus.async_fire(f"{DOMAIN}_face_scanned", {"face": next_face, "colors": colors})
+        # Reject if centre square is unknown
+        if scan.centre_color == "?":
+            _LOGGER.warning(
+                "Scan rejected — centre square unclassified. Check crop region and lighting."
+            )
+            await self._save_annotated(scan.annotated_image)
+            self.hass.bus.async_fire(f"{DOMAIN}_scan_rejected", {"reason": "centre_unknown"})
+            return
+
+        # Warn on partial unknowns but accept the scan
+        if scan.has_unknowns:
+            _LOGGER.warning(
+                "Face %s scanned with unknown squares: %s", scan.face_label, scan.colors
+            )
+
+        # Reject duplicate face
+        if scan.face_label in scanned:
+            _LOGGER.warning(
+                "Face with centre color %s already scanned. Rotate to a new face.",
+                scan.face_label,
+            )
+            return
+
+        scanned[scan.face_label] = scan.colors
+        _LOGGER.info("Scanned face %s: %s", scan.face_label, scan.colors)
+
+        await self._save_annotated(scan.annotated_image)
+
+        self.hass.bus.async_fire(
+            f"{DOMAIN}_face_scanned",
+            {"face": scan.face_label, "colors": scan.colors},
+        )
+
+    def _get_crop_box(self, data: dict) -> CropBox | None:
+        """Read current crop coordinates from number entity state."""
+        try:
+            from homeassistant.helpers import entity_registry as er
+            registry = er.async_get(self.hass)
+
+            def _value(key: str) -> int:
+                entity_id = registry.async_get_entity_id("number", DOMAIN, f"{self._entry.entry_id}_{key}")
+                if not entity_id:
+                    return 0
+                state = self.hass.states.get(entity_id)
+                return int(float(state.state)) if state else 0
+
+            left = _value("crop_left")
+            top = _value("crop_top")
+            right = _value("crop_right")
+            bottom = _value("crop_bottom")
+
+            if right > left and bottom > top:
+                return (left, top, right, bottom)
+        except Exception:
+            _LOGGER.debug("Could not read crop box from number entities, using full image")
+        return None
+
+    async def _save_annotated(self, image_bytes: bytes) -> None:
+        """Store annotated image in shared data (for camera entity) and www/ (for direct URL access)."""
+        self.hass.data[DOMAIN][self._entry.entry_id]["last_annotated_image"] = image_bytes
+        www_path = self.hass.config.path("www")
+        os.makedirs(www_path, exist_ok=True)
+        out_path = os.path.join(www_path, ANNOTATED_IMAGE_PATH)
+        await self.hass.async_add_executor_job(_write_file, out_path, image_bytes)
 
     async def _get_camera_snapshot(self, entity_id: str) -> bytes:
         """Request a snapshot from a HA camera entity."""
@@ -111,3 +174,8 @@ class ResetScanButton(ButtonEntity):
         self.hass.data[DOMAIN][self._entry.entry_id]["scanned_faces"] = {}
         self.hass.bus.async_fire(f"{DOMAIN}_scan_reset", {})
         _LOGGER.info("Cube scan reset.")
+
+
+def _write_file(path: str, data: bytes) -> None:
+    with open(path, "wb") as f:
+        f.write(data)

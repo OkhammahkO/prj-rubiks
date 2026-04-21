@@ -9,7 +9,6 @@ import voluptuous as vol
 
 from homeassistant.components.camera import DOMAIN as CAMERA_DOMAIN
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,

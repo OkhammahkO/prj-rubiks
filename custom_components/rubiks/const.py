@@ -36,3 +36,12 @@ CUBE_COLORS = {
 # Number of squares per face
 SQUARES_PER_FACE = 9
 GRID_SIZE = 3
+
+# Crop region number entity keys
+CROP_LEFT = "crop_left"
+CROP_TOP = "crop_top"
+CROP_RIGHT = "crop_right"
+CROP_BOTTOM = "crop_bottom"
+
+# Path for annotated output image (relative to HA www/)
+ANNOTATED_IMAGE_PATH = "rubiks_last_scan.jpg"

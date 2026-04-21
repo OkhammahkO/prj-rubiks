@@ -38,7 +38,8 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Sample images (optionally keep out of repo)
-*.jpg
-*.jpeg
-*.png
+# Track sample images in the repo but ignore images elsewhere
+!sample_images/
+!sample_images/*.jpg
+!sample_images/*.jpeg
+!sample_images/*.png

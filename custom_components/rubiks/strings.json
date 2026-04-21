@@ -50,6 +50,25 @@
       "reset_scan": {
         "name": "Reset Scan"
       }
+    },
+    "camera": {
+      "last_scan": {
+        "name": "Last Scan"
+      }
+    },
+    "number": {
+      "crop_left": {
+        "name": "Crop Left"
+      },
+      "crop_top": {
+        "name": "Crop Top"
+      },
+      "crop_right": {
+        "name": "Crop Right"
+      },
+      "crop_bottom": {
+        "name": "Crop Bottom"
+      }
     }
   }
 }

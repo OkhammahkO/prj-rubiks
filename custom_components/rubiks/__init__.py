@@ -8,14 +8,15 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 
-PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.CAMERA, Platform.NUMBER, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Rubiks from a config entry."""
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
-        "scanned_faces": {},  # face -> list of 9 color codes
+        "scanned_faces": {},
+        "last_annotated_image": None,
     }
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

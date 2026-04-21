@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, FACES
+from .const import CUBE_COLORS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,10 +33,7 @@ async def async_setup_entry(
 
 
 class CubeStateSensor(SensorEntity):
-    """Sensor showing the full cube state once all 6 faces are scanned.
-
-    Value is a 54-character string (standard kociemba notation) or None.
-    """
+    """Full cube state once all 6 faces are scanned (54-char string)."""
 
     entity_description = CUBE_STATE_SENSOR
     _attr_has_entity_name = True
@@ -58,12 +56,11 @@ class CubeStateSensor(SensorEntity):
 
     @callback
     def _on_face_scanned(self, event: Event) -> None:
-        """Update cube state when a face is scanned."""
-        scanned = self.hass.data[DOMAIN][self._entry.entry_id]["scanned_faces"]
-        if all(f in scanned for f in FACES):
-            # Build 54-char state string: U9 + R9 + F9 + D9 + L9 + B9
+        scanned: dict = self.hass.data[DOMAIN][self._entry.entry_id]["scanned_faces"]
+        if len(scanned) == 6:
+            # Build state string ordered by centre color: W Y R O B G
             self._attr_native_value = "".join(
-                "".join(scanned[face]) for face in FACES
+                "".join(scanned[color]) for color in CUBE_COLORS if color in scanned
             )
         else:
             self._attr_native_value = None
@@ -71,13 +68,12 @@ class CubeStateSensor(SensorEntity):
 
     @callback
     def _on_reset(self, event: Event) -> None:
-        """Clear state on reset."""
         self._attr_native_value = None
         self.async_write_ha_state()
 
 
 class CurrentFaceSensor(SensorEntity):
-    """Sensor showing which face will be scanned next."""
+    """Shows how many faces have been scanned and which colors are still missing."""
 
     entity_description = CURRENT_FACE_SENSOR
     _attr_has_entity_name = True
@@ -87,10 +83,10 @@ class CurrentFaceSensor(SensorEntity):
         self.hass = hass
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_current_face"
-        self._attr_native_value = FACES[0]
+        self._attr_native_value: str = "ready"
 
     async def async_added_to_hass(self) -> None:
-        """Subscribe to face scan events."""
+        """Subscribe to events."""
         self.async_on_remove(
             self.hass.bus.async_listen(f"{DOMAIN}_face_scanned", self._on_face_scanned)
         )
@@ -100,21 +96,19 @@ class CurrentFaceSensor(SensorEntity):
 
     @callback
     def _on_face_scanned(self, event: Event) -> None:
-        """Advance to next face."""
-        scanned = self.hass.data[DOMAIN][self._entry.entry_id]["scanned_faces"]
-        next_face = next((f for f in FACES if f not in scanned), None)
-        self._attr_native_value = next_face or "complete"
+        scanned: dict = self.hass.data[DOMAIN][self._entry.entry_id]["scanned_faces"]
+        missing = [c for c in CUBE_COLORS if c not in scanned]
+        self._attr_native_value = "complete" if not missing else f"missing: {', '.join(missing)}"
         self.async_write_ha_state()
 
     @callback
     def _on_reset(self, event: Event) -> None:
-        """Reset to first face."""
-        self._attr_native_value = FACES[0]
+        self._attr_native_value = "ready"
         self.async_write_ha_state()
 
 
 class FacesScannedSensor(SensorEntity):
-    """Sensor showing how many faces have been scanned (0-6)."""
+    """Number of faces scanned (0-6) with per-face color data as attributes."""
 
     entity_description = FACES_SCANNED_SENSOR
     _attr_has_entity_name = True
@@ -125,9 +119,10 @@ class FacesScannedSensor(SensorEntity):
         self.hass = hass
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_faces_scanned"
+        self._attr_extra_state_attributes: dict[str, Any] = {}
 
     async def async_added_to_hass(self) -> None:
-        """Subscribe to face scan events."""
+        """Subscribe to events."""
         self.async_on_remove(
             self.hass.bus.async_listen(f"{DOMAIN}_face_scanned", self._on_face_scanned)
         )
@@ -137,13 +132,16 @@ class FacesScannedSensor(SensorEntity):
 
     @callback
     def _on_face_scanned(self, event: Event) -> None:
-        """Increment count."""
-        scanned = self.hass.data[DOMAIN][self._entry.entry_id]["scanned_faces"]
+        scanned: dict = self.hass.data[DOMAIN][self._entry.entry_id]["scanned_faces"]
         self._attr_native_value = len(scanned)
+        # Expose each face's 9 colors keyed by centre color, e.g. {"W": ["W","R","G",...]}
+        self._attr_extra_state_attributes = {
+            color: colors for color, colors in scanned.items()
+        }
         self.async_write_ha_state()
 
     @callback
     def _on_reset(self, event: Event) -> None:
-        """Reset count."""
         self._attr_native_value = 0
+        self._attr_extra_state_attributes = {}
         self.async_write_ha_state()
