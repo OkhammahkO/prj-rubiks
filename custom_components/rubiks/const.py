@@ -11,19 +11,7 @@ CONF_SAMPLE_IMAGE = "sample_image"
 SOURCE_CAMERA = "camera"
 SOURCE_SAMPLE = "sample"
 
-# Face names (standard Rubik's cube notation)
-FACES = ["U", "R", "F", "D", "L", "B"]  # Up, Right, Front, Down, Left, Back
-FACE_NAMES = {
-    "U": "Up",
-    "R": "Right",
-    "F": "Front",
-    "D": "Down",
-    "L": "Left",
-    "B": "Back",
-}
-
-# Rubik's cube colors (HSV hue ranges, saturation/value thresholds)
-# Colors: White, Yellow, Red, Orange, Blue, Green
+# Rubik's cube colors keyed by centre square color code
 CUBE_COLORS = {
     "W": "white",
     "Y": "yellow",
@@ -33,9 +21,33 @@ CUBE_COLORS = {
     "G": "green",
 }
 
-# Number of squares per face
-SQUARES_PER_FACE = 9
-GRID_SIZE = 3
+# Scan order: Top, Back, Bottom, Front, Left, Right
+# Barrel-roll rotation — tilt same direction 4 times, then two side rotations
+SCAN_SEQUENCE = ["W", "B", "Y", "G", "O", "R"]
+
+# Motion instruction for each step in the scan sequence
+SCAN_MOTION = {
+    "W": "Load",
+    "B": "Tilt backward",
+    "Y": "Tilt backward",
+    "G": "Tilt backward",
+    "O": "Rotate left",
+    "R": "Rotate 180°",
+}
+
+# Loading position reminder shown for the first face
+SCAN_LOADING_HINT = "White facing camera, Blue at top, Orange on left"
+
+# Emoji squares for each colour — used in sensor attributes
+COLOUR_EMOJI = {
+    "W": "⬜",
+    "Y": "🟨",
+    "R": "🟥",
+    "O": "🟧",
+    "B": "🟦",
+    "G": "🟩",
+    "?": "⬛",
+}
 
 # Crop region number entity keys
 CROP_LEFT = "crop_left"
@@ -43,5 +55,14 @@ CROP_TOP = "crop_top"
 CROP_RIGHT = "crop_right"
 CROP_BOTTOM = "crop_bottom"
 
+# LED control entity keys
+LED_BRIGHTNESS = "led_brightness"
+LED_STABILISE_DELAY = "led_stabilise_delay"
+LED_ENTITY_ID = "led_entity_id"
+
 # Path for annotated output image (relative to HA www/)
 ANNOTATED_IMAGE_PATH = "rubiks_last_scan.jpg"
+
+# Device info
+DEVICE_MANUFACTURER = "OkhammahkO"
+DEVICE_MODEL = "Rubiks Cube Scanner"

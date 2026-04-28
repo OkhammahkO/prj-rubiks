@@ -66,8 +66,6 @@ class RubiksConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle camera entity selection."""
-        errors: dict[str, str] = {}
-
         if user_input is not None:
             return self.async_create_entry(
                 title="Rubiks Cube Scanner (Camera)",
@@ -86,7 +84,6 @@ class RubiksConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
                 }
             ),
-            errors=errors,
         )
 
     async def async_step_sample(
@@ -97,7 +94,8 @@ class RubiksConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             path = user_input[CONF_SAMPLE_IMAGE]
-            if not os.path.isfile(path):
+            exists = await self.hass.async_add_executor_job(os.path.isfile, path)
+            if not exists:
                 errors[CONF_SAMPLE_IMAGE] = "invalid_image"
             else:
                 return self.async_create_entry(

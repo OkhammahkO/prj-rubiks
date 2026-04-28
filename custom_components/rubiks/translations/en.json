@@ -1,4 +1,12 @@
 {
+  "selector": {
+    "source": {
+      "options": {
+        "camera": "Camera (ESPHome / HA camera entity)",
+        "sample": "Sample image (file path, for testing)"
+      }
+    }
+  },
   "config": {
     "step": {
       "user": {
@@ -41,34 +49,57 @@
       },
       "faces_scanned": {
         "name": "Faces Scanned"
+      },
+      "scan_warnings": {
+        "name": "Scan Warnings"
+      },
+      "kociemba_input": {
+        "name": "Kociemba Input"
+      },
+      "solution": {
+        "name": "Solution"
       }
     },
     "button": {
       "scan_face": {
         "name": "Scan Face"
       },
+      "preview_crop": {
+        "name": "Preview Crop"
+      },
       "reset_scan": {
         "name": "Reset Scan"
+      },
+      "save_calibration": {
+        "name": "Save Calibration"
+      },
+      "reset_calibration": {
+        "name": "Reset Calibration"
+      },
+      "solve": {
+        "name": "Solve"
       }
     },
-    "camera": {
-      "last_scan": {
-        "name": "Last Scan"
-      }
+    "image": {
+      "last_scan": {"name": "Last Scan"},
+      "face_w":    {"name": "Face White"},
+      "face_y":    {"name": "Face Yellow"},
+      "face_r":    {"name": "Face Red"},
+      "face_o":    {"name": "Face Orange"},
+      "face_b":    {"name": "Face Blue"},
+      "face_g":    {"name": "Face Green"},
+      "summary":   {"name": "Scan Summary"}
     },
     "number": {
-      "crop_left": {
-        "name": "Crop Left"
-      },
-      "crop_top": {
-        "name": "Crop Top"
-      },
-      "crop_right": {
-        "name": "Crop Right"
-      },
-      "crop_bottom": {
-        "name": "Crop Bottom"
-      }
+      "crop_left": {"name": "Crop Left"},
+      "crop_top": {"name": "Crop Top"},
+      "crop_right": {"name": "Crop Right"},
+      "crop_bottom": {"name": "Crop Bottom"},
+      "led_brightness": {"name": "LED Brightness"},
+      "led_stabilise_delay": {"name": "LED Stabilise Delay"}
+    },
+    "text": {
+      "led_entity_id": {"name": "LED Entity ID"}
     }
   }
 }
