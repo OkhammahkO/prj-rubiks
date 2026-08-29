@@ -19,12 +19,18 @@ from .const import (
     CROP_BOTTOM,
     CROP_LEFT,
     CROP_RIGHT,
+    CROP_ROTATION,
     CROP_TOP,
     DEVICE_MANUFACTURER,
     DEVICE_MODEL,
     DOMAIN,
+    INTEGRATION_VERSION,
     LED_BRIGHTNESS,
     LED_STABILISE_DELAY,
+    SCRAMBLE_MOVE_COUNT,
+    SCRAMBLE_MOVE_COUNT_DEFAULT,
+    SCRAMBLE_MOVE_COUNT_MAX,
+    SCRAMBLE_MOVE_COUNT_MIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -80,6 +86,18 @@ CROP_ENTITIES: list[tuple[NumberEntityDescription, float]] = [
         ),
         0,
     ),
+    (
+        NumberEntityDescription(
+            key=CROP_ROTATION,
+            translation_key=CROP_ROTATION,
+            native_min_value=0,
+            native_max_value=359,
+            native_step=1,
+            mode=NumberMode.SLIDER,
+            icon="mdi:rotate-right",
+        ),
+        0,
+    ),
 ]
 
 
@@ -102,6 +120,17 @@ LED_STABILISE_DELAY_DESCRIPTION = NumberEntityDescription(
     native_unit_of_measurement="s",
     mode=NumberMode.BOX,
     icon="mdi:timer-outline",
+)
+
+
+SCRAMBLE_MOVE_COUNT_DESCRIPTION = NumberEntityDescription(
+    key=SCRAMBLE_MOVE_COUNT,
+    translation_key=SCRAMBLE_MOVE_COUNT,
+    native_min_value=SCRAMBLE_MOVE_COUNT_MIN,
+    native_max_value=SCRAMBLE_MOVE_COUNT_MAX,
+    native_step=1,
+    mode=NumberMode.BOX,
+    icon="mdi:counter",
 )
 
 
@@ -130,10 +159,21 @@ async def async_setup_entry(
     )
     hass.data[DOMAIN][entry.entry_id]["led_stabilise_delay_entity"] = led_stabilise_delay
 
+    scramble_store = Store(hass, _STORAGE_VERSION, f"{DOMAIN}_scramble_{entry.entry_id}")
+    scramble_saved: dict[str, float] = await scramble_store.async_load() or {}
+
+    scramble_move_count = ScrambleMoveCountEntity(
+        hass,
+        entry,
+        scramble_saved.get(SCRAMBLE_MOVE_COUNT, float(SCRAMBLE_MOVE_COUNT_DEFAULT)),
+        scramble_store,
+    )
+    hass.data[DOMAIN][entry.entry_id]["scramble_move_count_entity"] = scramble_move_count
+
     async_add_entities([
         CropNumberEntity(hass, entry, desc, crop_saved.get(desc.key, default), crop_store)
         for desc, default in CROP_ENTITIES
-    ] + [led_brightness, led_stabilise_delay])
+    ] + [led_brightness, led_stabilise_delay, scramble_move_count])
 
 
 class CropNumberEntity(NumberEntity):
@@ -160,6 +200,7 @@ class CropNumberEntity(NumberEntity):
             identifiers={(DOMAIN, entry.entry_id)},
             name=DEVICE_MODEL,
             manufacturer=DEVICE_MANUFACTURER,
+            sw_version=INTEGRATION_VERSION,
         )
         _LOGGER.info("Crop %s initialised to %s", description.key, initial)
 
@@ -214,6 +255,7 @@ class LedBrightnessEntity(NumberEntity):
             identifiers={(DOMAIN, entry.entry_id)},
             name=DEVICE_MODEL,
             manufacturer=DEVICE_MANUFACTURER,
+            sw_version=INTEGRATION_VERSION,
         )
 
     async def async_set_native_value(self, value: float) -> None:
@@ -251,6 +293,7 @@ class LedStabiliseDelayEntity(NumberEntity):
             identifiers={(DOMAIN, entry.entry_id)},
             name=DEVICE_MODEL,
             manufacturer=DEVICE_MANUFACTURER,
+            sw_version=INTEGRATION_VERSION,
         )
 
     async def async_set_native_value(self, value: float) -> None:
@@ -263,3 +306,41 @@ class LedStabiliseDelayEntity(NumberEntity):
     def delay(self) -> float:
         """Return stabilisation delay in seconds."""
         return float(self._attr_native_value or 0.0)
+
+
+class ScrambleMoveCountEntity(NumberEntity):
+    """Number of random moves to generate for the Scramble button."""
+
+    _attr_has_entity_name = True
+    entity_description = SCRAMBLE_MOVE_COUNT_DESCRIPTION
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        initial: float,
+        store: Store,
+    ) -> None:
+        """Initialise."""
+        self.hass = hass
+        self._entry = entry
+        self._store = store
+        self._attr_unique_id = f"{entry.entry_id}_{SCRAMBLE_MOVE_COUNT}"
+        self._attr_native_value = initial
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=DEVICE_MODEL,
+            manufacturer=DEVICE_MANUFACTURER,
+            sw_version=INTEGRATION_VERSION,
+        )
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Persist and update move count."""
+        self._attr_native_value = value
+        self.async_write_ha_state()
+        await self._store.async_save({SCRAMBLE_MOVE_COUNT: value})
+
+    @property
+    def move_count(self) -> int:
+        """Return the configured scramble move count."""
+        return int(self._attr_native_value or SCRAMBLE_MOVE_COUNT_DEFAULT)

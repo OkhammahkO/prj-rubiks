@@ -39,6 +39,20 @@
       "already_configured": "Device is already configured."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Rubiks Cube Scanner Options",
+        "data": {
+          "camera_entity": "Camera entity",
+          "sample_image": "Image file path"
+        }
+      }
+    },
+    "error": {
+      "invalid_image": "Could not read the image file. Check the path."
+    }
+  },
   "entity": {
     "sensor": {
       "cube_state": {
@@ -78,6 +92,21 @@
       },
       "solve": {
         "name": "Solve"
+      },
+      "robot_start_scan": {
+        "name": "Robot Start Scan"
+      },
+      "robot_stop": {
+        "name": "Robot Stop"
+      },
+      "robot_abort": {
+        "name": "Robot Abort"
+      },
+      "robot_advance_face": {
+        "name": "Robot Advance Face"
+      },
+      "scramble": {
+        "name": "Scramble"
       }
     },
     "image": {
@@ -96,10 +125,9 @@
       "crop_right": {"name": "Crop Right"},
       "crop_bottom": {"name": "Crop Bottom"},
       "led_brightness": {"name": "LED Brightness"},
-      "led_stabilise_delay": {"name": "LED Stabilise Delay"}
-    },
-    "text": {
-      "led_entity_id": {"name": "LED Entity ID"}
+      "led_stabilise_delay": {"name": "LED Stabilise Delay"},
+      "crop_rotation": {"name": "Grid Rotation"},
+      "scramble_move_count": {"name": "Scramble Move Count"}
     }
   }
 }

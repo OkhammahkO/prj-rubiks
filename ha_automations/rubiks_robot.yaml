@@ -1,0 +1,200 @@
+# Rubiks Robot — Home Assistant Automation Templates
+#
+# These automations bridge the HA custom component (custom_components/rubiks)
+# and the ESP32 ESPHome robot (esphome/rubiks_solver.yaml).
+#
+# How to use:
+#   1. Copy these automations into your HA config (UI editor or automations.yaml).
+#   2. Replace <entry_id> in service calls with your actual rubiks integration entry ID,
+#      or use the UI to find the correct rubiks.* service names.
+#   3. Adjust the esphome device name if you changed 'device_name' in substitutions
+#      (default: rubiks-solver → services are esphome.rubiks_solver_*)
+#
+# Flow overview:
+#   HA calls start_scan  →  robot positions face 1  →  fires rubiks_face_ready
+#   automation 1 runs    →  snapshot + detect       →  calls face_scan_done
+#   robot positions face 2 ... repeat × 6
+#   robot fires rubiks_scan_complete
+#   automation 2 runs    →  rubiks.solve (response) →  calls execute_solution (response)
+#   robot executes       →  fires rubiks_solve_done
+#   automation 3 logs notification
+#
+#   HA robot buttons fire HA events; automations 4-6 translate to ESPHome calls:
+#   rubiks_robot_start_requested    → automation 4 → esphome start_scan
+#   rubiks_robot_stop_requested     → automation 5 → esphome stop
+#   rubiks_robot_advance_face_requested → automation 6 → esphome face_scan_done
+#
+#   Scramble button generates its own move string and fires rubiks_scramble_requested;
+#   automation 7 → esphome execute_solution (same pipeline/guards as a real solve).
+
+# ── Automation 1: Scan Coordinator ───────────────────────────────────────────
+# Triggered each time the robot signals a face is ready for scanning.
+# Runs the existing camera snapshot + colour detection pipeline,
+# then tells the robot to advance to the next face.
+
+- id: rubiks_scan_coordinator
+  alias: "Rubiks: Scan Coordinator"
+  description: >
+    When the robot signals a face is ready, snapshot the camera, run colour
+    detection for that face, then advance the robot to the next face.
+  trigger:
+    - platform: event
+      event_type: esphome.rubiks_face_ready
+  action:
+    # 1. Brief settle delay — robot fires the event as soon as the last servo step
+    #    is dispatched, not after it physically completes. Give the mechanism and
+    #    camera frame buffer time to settle before capturing.
+    - delay:
+        milliseconds: 300
+
+    # 2. Run illuminate → capture → detect → store for the face the robot declared.
+    #    Uses ROBOT_CAMERA_TO_KOCIEMBA_REMAP (top-down camera orientation).
+    #    After all 6 faces this also runs calibration and fires rubiks_calibrated.
+    - service: rubiks.robot_scan_face
+      data:
+        face: "{{ trigger.event.data.face }}"
+
+    # 3. Signal robot to advance to the next face (or start solve if all done).
+    - service: esphome.rubiks_solver_face_scan_done
+  mode: single
+  max_exceeded: silent
+
+# ── Automation 2: Solve Dispatcher ───────────────────────────────────────────
+# Triggered when the robot signals all 6 faces are scanned.
+# Uses rubiks.solve with a response variable — no button press, no delay,
+# no sensor polling. execute_solution also returns accepted/move_count for validation.
+
+- id: rubiks_solve_dispatcher
+  alias: "Rubiks: Solve Dispatcher"
+  description: >
+    When the robot signals all 6 faces are scanned, run the kociemba solver
+    via rubiks.solve (response variable) and send the solution string back to
+    the robot. Logs whether the solution was accepted and how many moves.
+  trigger:
+    - platform: event
+      event_type: esphome.rubiks_scan_complete
+  action:
+    # 1. Let the "SCAN END" beep (3 beeps at ~120bpm, ~1.25s) finish before anything
+    #    below can start real servo motion again — kociemba can resolve fast enough
+    #    (especially the already-solved short-circuit) that execute_solution's first
+    #    move would otherwise start while the beep's still playing. No firmware step
+    #    queue covers this gap since it's this automation's own latency, not a queued
+    #    duration — see docs/collision-prevention.md "Settle pads at the scan-return
+    #    boundary".
+    - delay:
+        milliseconds: 1500
+
+    # 2. Scan's done — turn the illumination LED off. Adjust the entity_id to whatever
+    #    you set as your LED Entity ID in the integration options (matches the README's
+    #    example, light.rubiks_led). Runs regardless of solve outcome below.
+    - service: light.turn_off
+      target:
+        entity_id: light.rubiks_led
+
+    # 3. Run kociemba solver — response contains solution, move_count, cube_string.
+    - service: rubiks.solve
+      response_variable: solve_result
+
+    # 4. Only proceed if solve succeeded (no error key in response).
+    - condition: template
+      value_template: "{{ 'error' not in solve_result }}"
+
+    # 5. Send solution string to robot; response tells us if it was accepted.
+    - service: esphome.rubiks_solver_execute_solution
+      data:
+        solution: "{{ solve_result.solution }}"
+      response_variable: exec_result
+  mode: single
+  max_exceeded: silent
+
+# ── Automation 3: Solve Done Notification ────────────────────────────────────
+# Triggered when the robot finishes executing the solution.
+
+- id: rubiks_solve_done
+  alias: "Rubiks: Solve Done"
+  description: Log when the robot finishes executing a solution.
+  trigger:
+    - platform: event
+      event_type: esphome.rubiks_solve_done
+  action:
+    # Safety net — scan-complete already turns this off, but a directly-triggered solve
+    # (no preceding robot scan) wouldn't have gone through that path. Same entity_id note
+    # as automation 2 applies.
+    - service: light.turn_off
+      target:
+        entity_id: light.rubiks_led
+    - service: system_log.write
+      data:
+        message: "Rubiks: robot solve complete — {{ trigger.event.data }}"
+        level: info
+  mode: single
+  max_exceeded: silent
+
+# ── Automation 4: Robot Start Scan ───────────────────────────────────────────
+# The HA Robot Start Scan button fires rubiks_robot_start_requested.
+# This automation translates it to the ESPHome start_scan call.
+# Keeping the ESPHome device name out of the Python button class means
+# renaming the device only requires updating this file.
+
+- id: rubiks_robot_start_scan
+  alias: "Rubiks: Robot Start Scan"
+  description: >
+    Relay the rubiks_robot_start_requested HA event to the ESPHome start_scan action.
+  trigger:
+    - platform: event
+      event_type: rubiks_robot_start_requested
+  action:
+    - service: esphome.rubiks_solver_start_scan
+  mode: single
+  max_exceeded: silent
+
+# ── Automation 5: Robot Stop ─────────────────────────────────────────────────
+# Both Robot Stop and Robot Abort buttons fire rubiks_robot_stop_requested.
+
+- id: rubiks_robot_stop
+  alias: "Rubiks: Robot Stop"
+  description: >
+    Relay the rubiks_robot_stop_requested HA event to the ESPHome stop action.
+  trigger:
+    - platform: event
+      event_type: rubiks_robot_stop_requested
+  action:
+    - service: esphome.rubiks_solver_stop
+  mode: restart
+  max_exceeded: silent
+
+# ── Automation 6: Robot Advance Face ─────────────────────────────────────────
+# The HA Robot Advance Face button fires rubiks_robot_advance_face_requested.
+# Used for manual step-through during testing / debugging without HA auto-advance.
+
+- id: rubiks_robot_advance_face
+  alias: "Rubiks: Robot Advance Face"
+  description: >
+    Relay the rubiks_robot_advance_face_requested HA event to the ESPHome
+    face_scan_done action (manually advances the robot to the next face).
+  trigger:
+    - platform: event
+      event_type: rubiks_robot_advance_face_requested
+  action:
+    - service: esphome.rubiks_solver_face_scan_done
+  mode: single
+  max_exceeded: silent
+
+# ── Automation 7: Robot Scramble ─────────────────────────────────────────────
+# The HA Scramble button generates the move string itself and fires
+# rubiks_scramble_requested with it — this automation just relays it to
+# execute_solution, same pipeline (and same guards) as a real solve.
+
+- id: rubiks_robot_scramble
+  alias: "Rubiks: Robot Scramble"
+  description: >
+    Relay a generated scramble string to the ESPHome execute_solution action.
+  trigger:
+    - platform: event
+      event_type: rubiks_scramble_requested
+  action:
+    - service: esphome.rubiks_solver_execute_solution
+      data:
+        solution: "{{ trigger.event.data.solution }}"
+  mode: single
+  max_exceeded: silent

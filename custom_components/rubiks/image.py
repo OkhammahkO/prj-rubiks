@@ -11,7 +11,13 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .const import CUBE_COLORS, DEVICE_MANUFACTURER, DEVICE_MODEL, DOMAIN
+from .const import (
+    CUBE_COLORS,
+    DEVICE_MANUFACTURER,
+    DEVICE_MODEL,
+    DOMAIN,
+    INTEGRATION_VERSION,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,11 +28,13 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Rubiks image entities."""
-    async_add_entities([
-        LastScanImage(hass, entry),
-        *[FaceScanImage(hass, entry, colour) for colour in CUBE_COLORS],
-        SummaryImage(hass, entry),
-    ])
+    async_add_entities(
+        [
+            LastScanImage(hass, entry),
+            *[FaceScanImage(hass, entry, colour) for colour in CUBE_COLORS],
+            SummaryImage(hass, entry),
+        ]
+    )
 
 
 class RubiksImageBase(ImageEntity):
@@ -44,12 +52,15 @@ class RubiksImageBase(ImageEntity):
             identifiers={(DOMAIN, entry.entry_id)},
             name=DEVICE_MODEL,
             manufacturer=DEVICE_MANUFACTURER,
+            sw_version=INTEGRATION_VERSION,
         )
 
     def _refresh(self, image_bytes: bytes | None) -> None:
         """Update image bytes and notify HA."""
         self._image_bytes = image_bytes
-        self._cached_image = None
+        # Clear cached image if it exists. Use safe approach to avoid breaking on HA version changes.
+        if hasattr(self, "_cached_image"):
+            self._cached_image = None
         self._attr_image_last_updated = dt_util.now()
         self.async_write_ha_state()
 
@@ -61,7 +72,9 @@ class RubiksImageBase(ImageEntity):
 class LastScanImage(RubiksImageBase):
     """Most recent annotated scan — updates on every scan or preview."""
 
-    entity_description = ImageEntityDescription(key="last_scan", translation_key="last_scan")
+    entity_description = ImageEntityDescription(
+        key="last_scan", translation_key="last_scan"
+    )
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialise."""
@@ -112,7 +125,9 @@ class FaceScanImage(RubiksImageBase):
     def _on_face_scanned(self, event: Event) -> None:
         if event.data.get("face") != self._colour:
             return
-        images = self.hass.data[DOMAIN][self._entry.entry_id].get("face_annotated_images", {})
+        images = self.hass.data[DOMAIN][self._entry.entry_id].get(
+            "face_annotated_images", {}
+        )
         self._refresh(images.get(self._colour))
 
     @callback
@@ -123,7 +138,9 @@ class FaceScanImage(RubiksImageBase):
 class SummaryImage(RubiksImageBase):
     """3×2 grid of all 6 face scans — generated after calibration."""
 
-    entity_description = ImageEntityDescription(key="summary", translation_key="summary")
+    entity_description = ImageEntityDescription(
+        key="summary", translation_key="summary"
+    )
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialise."""
@@ -142,9 +159,7 @@ class SummaryImage(RubiksImageBase):
 
     @callback
     def _on_calibrated(self, event: Event) -> None:
-        self._refresh(
-            self.hass.data[DOMAIN][self._entry.entry_id].get("summary_image")
-        )
+        self._refresh(self.hass.data[DOMAIN][self._entry.entry_id].get("summary_image"))
 
     @callback
     def _on_reset(self, event: Event) -> None:

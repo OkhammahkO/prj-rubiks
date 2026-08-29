@@ -62,6 +62,37 @@ CAMERA_TO_KOCIEMBA_REMAP: dict[str, list[int]] = {
     "R": [0, 1, 2, 3, 4, 5, 6, 7, 8],
 }
 
+# Remap for robot scan (top-down camera, cube White=top Green=front).
+# Camera frame: row 0 = Green(F) side, row 2 = Blue(B) side,
+#               col 0 = Red(R) side, col 2 = Orange(L) side.
+# Empirically confirmed: Green at image top, Red at image left.
+#
+# Derivations (camera adjacencies → kociemba canonical adjacencies):
+#   W: cam(G-top,R-left) vs kocie-U(B-top,L-left) → 180°
+#   B: cam(W-top,R-left) vs kocie-B(W-top,R-left) → identity   [after 1 flip: F=W]
+#   Y: cam(B-top,R-left) vs kocie-D(G-top,L-left) → 180°       [after 2 flips: F=B]
+#   G: cam(Y-top,R-left) vs kocie-F(W-top,L-left) → 180°       [after 3 flips: F=Y]
+#   R: cam(G-top,Y-left) vs kocie-R(W-top,G-left) → 90°CCW     [after spinCW+flip: L=W]
+#   O: cam(B-top,Y-left) vs kocie-L(W-top,B-left) → 90°CCW     [after +2 flips: L=W]
+# (R/O at positions 4/5 were flip-flopped twice on 2026-07-26 based on verbal camera reads
+# that contradicted each other — Red/Orange is a documented confusion pair on this camera.
+# Settled by mathematical derivation from Loading Position + Flip/Spin definitions, see
+# the SCAN_FACES comment in rubiks_solver.cpp. The remap values below are unaffected by
+# which name goes where: both were already identity either way.)
+#
+# Transforms as index permutations:
+#   identity:    [0, 1, 2, 3, 4, 5, 6, 7, 8]
+#   180°:        [8, 7, 6, 5, 4, 3, 2, 1, 0]
+#   90° CCW:     [2, 5, 8, 1, 4, 7, 0, 3, 6]
+ROBOT_CAMERA_TO_KOCIEMBA_REMAP: dict[str, list[int]] = {
+    "W": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — FACE_SCAN_ROTATIONS 180° handles it
+    "B": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — raw cam already matches kociemba B
+    "Y": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — FACE_SCAN_ROTATIONS 180° handles it
+    "G": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — FACE_SCAN_ROTATIONS 180° handles it
+    "O": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — FACE_SCAN_ROTATIONS 90° CCW handles it
+    "R": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — FACE_SCAN_ROTATIONS 90° CCW handles it
+}
+
 # Edge positions: each entry is (face1, index1, face2, index2).
 # Both positions belong to the same physical edge piece.
 _EDGE_POSITIONS: list[tuple[str, int, str, int]] = [
@@ -88,16 +119,21 @@ _OPPOSITE_PAIRS: frozenset[frozenset[str]] = frozenset([
 
 def build_kociemba_faces(
     scanned_faces: dict[str, list[str]],
+    remap: dict[str, list[int]] | None = None,
 ) -> dict[str, list[str]] | None:
     """Convert camera-ordered scanned faces to kociemba face format.
 
     Returns a dict keyed by kociemba face label (U/R/F/D/L/B) with sticker values
     as kociemba face letters, or None if any face is missing, wrong length, or
     contains unclassified squares.
+
+    Pass ROBOT_CAMERA_TO_KOCIEMBA_REMAP as ``remap`` for robot top-down scans;
+    defaults to CAMERA_TO_KOCIEMBA_REMAP (Phase 1/2 barrel-roll).
     """
     if len(scanned_faces) != 6:
         return None
 
+    active_remap = remap if remap is not None else CAMERA_TO_KOCIEMBA_REMAP
     kociemba_faces: dict[str, list[str]] = {}
 
     for colour, camera_stickers in scanned_faces.items():
@@ -105,13 +141,13 @@ def build_kociemba_faces(
             return None
 
         face_label = COLOUR_TO_FACE.get(colour)
-        remap = CAMERA_TO_KOCIEMBA_REMAP.get(colour)
-        if face_label is None or remap is None:
+        face_remap = active_remap.get(colour)
+        if face_label is None or face_remap is None:
             _LOGGER.warning("Unknown colour code in scanned_faces: %s", colour)
             return None
 
         kociemba_stickers: list[str] = ["?"] * 9
-        for camera_idx, kociemba_idx in enumerate(remap):
+        for camera_idx, kociemba_idx in enumerate(face_remap):
             kociemba_stickers[kociemba_idx] = COLOUR_TO_STICKER.get(
                 camera_stickers[camera_idx], "?"
             )

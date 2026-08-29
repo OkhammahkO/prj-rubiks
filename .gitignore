@@ -38,8 +38,11 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Track sample images in the repo but ignore images elsewhere
-!sample_images/
-!sample_images/*.jpg
-!sample_images/*.jpeg
-!sample_images/*.png
+# ESPHome
+esphome/secrets.yaml
+esphome/reference/
+esphome/.esphome/
+
+# Third-party reference source, dropped in manually — not part of this repo
+CUBOTino_Files/
+

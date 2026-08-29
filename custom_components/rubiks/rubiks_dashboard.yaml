@@ -1,0 +1,279 @@
+type: sections
+title: Rubiks
+max_columns: 4
+cards: []
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Robot
+        heading_style: title
+      - type: tile
+        entity: sensor.rubiks_solver_status
+        name: Status
+        grid_options:
+          columns: 12
+          rows: 1
+      - type: entities
+        entities:
+          - entity: button.rubiks_cube_scanner_robot_abort
+            name:
+              type: entity
+          - entity: button.rubiks_cube_scanner_robot_stop
+            name:
+              type: entity
+          - entity: button.rubiks_cube_scanner_robot_start_scan
+            name:
+              type: entity
+          # Debug/step-through control for the robot's own scan sequencing — currently a
+          # no-op in normal use, since the Scan Coordinator automation already auto-advances
+          # after each capture. Only does something if that automation is edited to drop its
+          # own face_scan_done call.
+          - entity: button.rubiks_cube_scanner_robot_advance_face
+            name: Advance Face (debug)
+      - type: glance
+        title: Actions
+        entities:
+          - entity: button.rubiks_cube_scanner_preview_crop
+            name: Preview
+            show_state: false
+            tap_action:
+              action: toggle
+          - entity: button.rubiks_cube_scanner_save_calibration
+            name: Save Cal
+            show_state: false
+            tap_action:
+              action: toggle
+          - entity: button.rubiks_cube_scanner_reset_calibration
+            name: Reset Cal
+            show_state: false
+            tap_action:
+              action: toggle
+        grid_options:
+          columns: 12
+          rows: 3
+      - type: glance
+        title: Manual Scan
+        entities:
+          - entity: button.rubiks_cube_scanner_scan_face
+            name: Scan Face
+            show_state: false
+            tap_action:
+              action: toggle
+          - entity: button.rubiks_cube_scanner_reset_scan
+            name: Reset
+            show_state: false
+            tap_action:
+              action: toggle
+        grid_options:
+          columns: 12
+          rows: 3
+      - type: heading
+        heading: Configuration
+        heading_style: subtitle
+      - type: entities
+        title: LED
+        entities:
+          - entity: text.rubiks_cube_scanner_led_entity_id
+            name:
+              type: entity
+          - entity: number.rubiks_cube_scanner_led_brightness
+            name:
+              type: entity
+          - entity: number.rubiks_cube_scanner_led_stabilise_delay
+            name:
+              type: entity
+        grid_options:
+          columns: 12
+          rows: auto
+  - type: grid
+    cards:
+      - type: heading
+        heading: Live View
+        heading_style: title
+      - show_state: true
+        show_name: true
+        camera_view: live
+        fit_mode: cover
+        type: picture-entity
+        entity: light.rubiks_solver_flash_led
+        camera_image: camera.rubiks_solver_camera
+        grid_options:
+          columns: 12
+          rows: auto
+      - show_state: true
+        show_name: false
+        camera_view: live
+        fit_mode: cover
+        type: picture-entity
+        entity: image.rubiks_cube_scanner_last_scan
+        grid_options:
+          columns: 12
+          rows: auto
+      - type: entities
+        title: Crop
+        entities:
+          - entity: number.rubiks_cube_scanner_crop_left
+            name:
+              type: entity
+          - entity: number.rubiks_cube_scanner_crop_right
+            name:
+              type: entity
+          - entity: number.rubiks_cube_scanner_crop_top
+            name:
+              type: entity
+          - entity: number.rubiks_cube_scanner_crop_bottom
+            name:
+              type: entity
+          - entity: number.rubiks_cube_scanner_crop_rotation
+            name:
+              type: entity
+        grid_options:
+          columns: 12
+          rows: auto
+  - type: grid
+    cards:
+      - type: heading
+        heading: Scan Progress
+        heading_style: title
+      - type: tile
+        entity: sensor.rubiks_cube_scanner_current_face
+        name: Current Face
+        grid_options:
+          columns: 12
+          rows: 1
+      - type: tile
+        entity: sensor.rubiks_cube_scanner_faces_scanned
+        name: Faces Scanned
+        grid_options:
+          columns: 6
+          rows: 1
+      - type: tile
+        entity: sensor.rubiks_cube_scanner_scan_warnings
+        name: Warnings
+        color: red
+        grid_options:
+          columns: 6
+          rows: 1
+      - type: picture-entity
+        entity: image.rubiks_cube_scanner_face_white
+        name: White
+        show_name: true
+        show_state: false
+        grid_options:
+          columns: 6
+          rows: auto
+      - type: picture-entity
+        entity: image.rubiks_cube_scanner_face_blue
+        name: Blue
+        show_name: true
+        show_state: false
+        grid_options:
+          columns: 6
+          rows: auto
+      - type: picture-entity
+        entity: image.rubiks_cube_scanner_face_yellow
+        name: Yellow
+        show_name: true
+        show_state: false
+        grid_options:
+          columns: 6
+          rows: auto
+      - type: picture-entity
+        entity: image.rubiks_cube_scanner_face_green
+        name: Green
+        show_name: true
+        show_state: false
+        grid_options:
+          columns: 6
+          rows: auto
+      - type: picture-entity
+        entity: image.rubiks_cube_scanner_face_red
+        name: Red
+        show_name: true
+        show_state: false
+        grid_options:
+          columns: 6
+          rows: auto
+      - type: picture-entity
+        entity: image.rubiks_cube_scanner_face_orange
+        name: Orange
+        show_name: true
+        show_state: false
+        grid_options:
+          columns: 6
+          rows: auto
+      - show_state: false
+        show_name: true
+        camera_view: auto
+        fit_mode: cover
+        type: picture-entity
+        entity: image.rubiks_cube_scanner_scan_summary
+        name: Scan Summary
+        grid_options:
+          columns: 12
+          rows: auto
+  - type: grid
+    cards:
+      - type: heading
+        heading: Solve
+        heading_style: title
+      - type: tile
+        entity: sensor.rubiks_cube_scanner_cube_state
+        name: Cube State
+        grid_options:
+          columns: 12
+          rows: 1
+      - type: tile
+        entity: sensor.rubiks_cube_scanner_kociemba_input
+        name: Kociemba Input
+        grid_options:
+          columns: 12
+          rows: 1
+      - type: glance
+        entities:
+          - entity: button.rubiks_cube_scanner_solve
+            name: Solve
+            show_state: false
+          - entity: button.rubiks_cube_scanner_scramble
+            name: Scramble
+            show_state: false
+        grid_options:
+          columns: 4
+          rows: 2
+      - type: tile
+        entity: number.rubiks_cube_scanner_scramble_move_count
+        name: Scramble Move Count
+        grid_options:
+          columns: 4
+          rows: 1
+      - type: tile
+        entity: sensor.rubiks_cube_scanner_solution
+        name: Solution
+        grid_options:
+          columns: 8
+          rows: 1
+      - type: markdown
+        content: >-
+          **Warnings:** {{
+          state_attr('sensor.rubiks_cube_scanner_scan_warnings', 'warnings') or
+          'None' }}
+
+
+          **Corrections:** {{
+          state_attr('sensor.rubiks_cube_scanner_cube_state', 'corrections
+          applied') }}
+
+          **Valid:** {{ state_attr('sensor.rubiks_cube_scanner_cube_state',
+          'cube is valid') }}
+
+          **Cube:** {{ state_attr('sensor.rubiks_cube_scanner_cube_state',
+          'cube') }}
+
+
+          ---
+
+          **Loading position:** White up · Green toward camera
+        grid_options:
+          columns: 12
+          rows: auto

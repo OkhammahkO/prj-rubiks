@@ -7,7 +7,7 @@ A HACS custom integration that uses a fixed ESP32-CAM (via ESPHome) to scan all 
 1. Mount an ESP32-CAM (OV2640, via ESPHome) on a fixed frame pointing at the cube
 2. Set the crop region using the slider entities so the face fills the grid
 3. Present each face to the camera in sequence and press **Scan Face**
-4. The integration captures an image, classifies each of the 9 squares using CIELAB colour distance, and stores the face by its centre square colour
+4. The integration captures an image, classifies each of the 9 squares using CIELAB colour distance
 5. After all 6 faces are scanned, per-session calibration refines the classification using actual camera readings, then validates colour counts
 6. Press **Solve** — the **Solution** sensor shows the move sequence to solve the cube
 
@@ -25,8 +25,8 @@ Present faces to the camera in this order — a simple barrel-roll rotation:
 | 2 | **Blue** | Tilt cube backward 90° |
 | 3 | **Yellow** | Tilt backward 90° again |
 | 4 | **Green** | Tilt backward 90° again |
-| 5 | **Orange** | Rotate 90° left |
-| 6 | **Red** | Rotate 180° |
+| 5 | **Red** | Rotate 90° left |
+| 6 | **Orange** | Rotate 180° |
 
 The **Current Face** sensor tracks your position in this sequence.
 
@@ -149,19 +149,19 @@ Saved references persist across HA restarts in `.storage/rubiks_cal_<entry_id>`.
 
 ## Troubleshooting
 
-**Centre square unclassified (`?`)**  
+**Centre square unclassified (`?`)**
 Crop region too wide (background pixels included), insufficient lighting, or heavy colour cast. Check the **Last Scan** image and adjust the crop sliders.
 
-**Scan Warnings > 0**  
+**Scan Warnings > 0**
 Open the **Scan Warnings** sensor attributes for the plain-English list. A colour appearing more than 9 times usually means you presented the wrong face — press **Reset Scan** and start over, being careful to follow the **Current Face** sensor.
 
-**Cube is valid: false**  
+**Cube is valid: false**
 After calibration, colour counts were unequal. Check the **Faces Scanned** sensor attributes for low-confidence stickers to identify which face is the problem, then press **Reset Scan** and redo all 6 faces with better lighting or a tighter crop on the suspect face.
 
-**Solver returns moves for an already-solved cube**  
+**Solver returns moves for an already-solved cube**
 This is handled automatically — the integration detects a solved state and returns "Already solved!" without calling the solver.
 
-**Images too dark**  
+**Images too dark**
 Increase **LED Stabilise Delay** — your LED may need longer to reach full brightness before the camera captures.
 
 ---
@@ -178,6 +178,9 @@ ln -s /workspaces/prj-rubiks/custom_components/rubiks \
 
 # Install test dependencies
 uv pip install -r requirements_test.txt
+
+# Run tests
+pytest custom_components/rubiks/tests/ -v
 ```
 
 See [docs/spec.md](docs/spec.md) for architecture details.

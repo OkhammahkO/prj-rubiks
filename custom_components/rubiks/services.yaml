@@ -1,0 +1,28 @@
+solve:
+  name: Solve
+  description: >
+    Run the kociemba solver against all stored face scans and return the solution
+    move sequence. Fires rubiks_solved on success. Returns solution, move_count,
+    and cube_string; returns error key on failure.
+
+robot_scan_face:
+  name: Robot Scan Face
+  description: >
+    Capture and store a face scan from the top-down robot camera.
+    Called by the HA automation after the robot fires esphome.rubiks_face_ready.
+    After all 6 faces are stored, triggers calibration and kociemba face assembly.
+  fields:
+    face:
+      name: Face
+      description: Which face is currently under the camera (robot scan sequence order).
+      required: true
+      example: "W"
+      selector:
+        select:
+          options:
+            - "W"
+            - "B"
+            - "Y"
+            - "G"
+            - "R"
+            - "O"

@@ -17,6 +17,7 @@ from .const import (
     DEVICE_MANUFACTURER,
     DEVICE_MODEL,
     DOMAIN,
+    INTEGRATION_VERSION,
     SCAN_LOADING_HINT,
     SCAN_MOTION,
     SCAN_SEQUENCE,
@@ -53,12 +54,10 @@ def _cube_net(scanned: dict[str, list[str]]) -> str:
             for r in range(3)
         ]
 
-    w, o, g, r, y = (
+    w, o, g, r, y, b = (
         face_rows("W"), face_rows("O"), face_rows("G"),
-        face_rows("R"), face_rows("Y"),
+        face_rows("R"), face_rows("Y"), face_rows("B"),
     )
-    # B is captured with Yellow at top; the net expects White at top — 180° rotation.
-    b = [row[::-1] for row in reversed(face_rows("B"))]
 
     s = "⬛"
     sep_row = s * 15                          # full-width separator row
@@ -81,22 +80,22 @@ def _cube_net(scanned: dict[str, list[str]]) -> str:
     return "\n" + "\n".join(lines)
 
 CUBE_STATE_SENSOR = SensorEntityDescription(
-    key="cube_state", translation_key="cube_state"
+    key="cube_state", translation_key="cube_state", icon="mdi:cube-outline"
 )
 CURRENT_FACE_SENSOR = SensorEntityDescription(
-    key="current_face", translation_key="current_face"
+    key="current_face", translation_key="current_face", icon="mdi:compass-outline"
 )
 FACES_SCANNED_SENSOR = SensorEntityDescription(
-    key="faces_scanned", translation_key="faces_scanned"
+    key="faces_scanned", translation_key="faces_scanned", icon="mdi:counter"
 )
 SCAN_WARNINGS_SENSOR = SensorEntityDescription(
-    key="scan_warnings", translation_key="scan_warnings"
+    key="scan_warnings", translation_key="scan_warnings", icon="mdi:alert-circle-outline"
 )
 KOCIEMBA_INPUT_SENSOR = SensorEntityDescription(
-    key="kociemba_input", translation_key="kociemba_input"
+    key="kociemba_input", translation_key="kociemba_input", icon="mdi:code-brackets"
 )
 SOLUTION_SENSOR = SensorEntityDescription(
-    key="solution", translation_key="solution"
+    key="solution", translation_key="solution", icon="mdi:routes"
 )
 
 
@@ -129,6 +128,7 @@ class RubiksSensorBase(SensorEntity):
             identifiers={(DOMAIN, entry.entry_id)},
             name=DEVICE_MODEL,
             manufacturer=DEVICE_MANUFACTURER,
+            sw_version=INTEGRATION_VERSION,
         )
 
     async def async_added_to_hass(self) -> None:
@@ -369,7 +369,7 @@ class FacesScannedSensor(RubiksSensorBase):
             if scan and len(scan.lab_readings) == 9:
                 attrs[face_label] = [
                     {"color": c, "L": round(L, 1), "a": round(a, 1), "b": round(b, 1)}
-                    for c, (L, a, b) in zip(colors, scan.lab_readings)
+                    for c, (L, a, b) in zip(colors, scan.lab_readings, strict=True)
                 ]
             else:
                 attrs[face_label] = colors

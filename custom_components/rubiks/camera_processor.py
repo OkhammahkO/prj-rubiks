@@ -39,6 +39,23 @@ OVERLAY_COLORS: dict[str, tuple[int, int, int]] = {
     "?": (255,   0, 255),
 }
 
+# Per-face image rotation applied before sticker detection (PIL convention: positive = CCW).
+# Derived from physical verification of the robot's camera orientation for each face.
+# W/Y/G are captured 180° from expected; O and R need 90° CCW correction (brings White
+# to image-top, Green/Blue respectively to image-left — verified against the confirmed
+# image-left=physical-Right mount). R/O at positions 4/5 were flip-flopped twice on
+# 2026-07-26 based on verbal camera reads that contradicted each other (Red/Orange is a
+# known confusion pair on this sensor, see REFERENCE_LAB comment above) — settled by
+# mathematical derivation, see the SCAN_FACES comment in rubiks_solver.cpp.
+FACE_SCAN_ROTATIONS: dict[str, float] = {
+    "W":  180,
+    "B":    0,
+    "Y":  180,
+    "G":  180,
+    "O":   90,   # CCW (PIL positive) — brings White to image-top, Blue to image-left
+    "R":   90,   # CCW (PIL positive) — brings White to image-top, Green to image-left
+}
+
 CropBox = tuple[int, int, int, int]  # left, top, right, bottom
 
 _L_WEIGHT = 1.5   # L is a reliable discriminator on OV2640 — Red L≈14-38, Orange L≈40-63
@@ -47,6 +64,25 @@ _LAB_UNKNOWN_THRESHOLD = 80.0  # distance beyond which a sample is classified "?
 
 # 5 sample offsets per cell: centre + 4 inner corners (at ¼ cell distance).
 _OFFSETS = [(0, 0), (-1, -1), (1, -1), (-1, 1), (1, 1)]
+
+
+def _unrotate_point(
+    point: tuple[int, int], angle_deg: float, centre: tuple[float, float]
+) -> tuple[int, int]:
+    """Map a point from a PIL-rotated image's frame back to the pre-rotation frame.
+
+    Inverse of Image.rotate(angle_deg) (PIL convention: positive = CCW) about `centre`.
+    Sticker sampling runs on a rotated copy of the crop, but the annotation overlay is
+    drawn on the original, unrotated image — this maps sample points back so the overlay
+    lines up with what's actually shown (see docs/orientation.md, "overlay misalignment").
+    """
+    if angle_deg % 360 == 0:
+        return point
+    theta = math.radians(angle_deg)
+    cos_t, sin_t = math.cos(theta), math.sin(theta)
+    cx, cy = centre
+    dx, dy = point[0] - cx, point[1] - cy
+    return (round(cx + dx * cos_t - dy * sin_t), round(cy + dx * sin_t + dy * cos_t))
 
 
 def _srgb_to_lab(r: int, g: int, b: int) -> tuple[float, float, float]:
@@ -118,6 +154,7 @@ def detect_face_colors(
     crop_box: CropBox | None = None,
     references: dict[str, tuple[float, float, float]] | None = None,
     override_centre: str | None = None,
+    rotation: float = 0.0,
 ) -> FaceScan:
     """Detect the 9 square colours from an image using LAB nearest-neighbour classification.
 
@@ -138,6 +175,13 @@ def detect_face_colors(
     else:
         face_image = image
         box_offset = (0, 0)
+
+    # Combine global crop rotation (CW-positive, so negate for PIL) with per-face
+    # orientation correction (CCW-positive, PIL native). B needs no correction.
+    face_pil_angle = FACE_SCAN_ROTATIONS.get(override_centre, 0) if override_centre else 0
+    total_pil_angle = face_pil_angle - rotation
+    if total_pil_angle % 360:
+        face_image = face_image.rotate(total_pil_angle, expand=False, fillcolor=(0, 0, 0))
 
     rgb_image = face_image.convert("RGB")
     width, height = rgb_image.size
@@ -168,7 +212,7 @@ def detect_face_colors(
                 bottom_s = min(height, py + sample_size)
 
                 region = rgb_image.crop((left_s, top_s, right_s, bottom_s))
-                pixels = list(region.getdata())
+                pixels = list(region.get_flattened_data())
                 avg_r = sum(p[0] for p in pixels) // len(pixels)
                 avg_g = sum(p[1] for p in pixels) // len(pixels)
                 avg_b = sum(p[2] for p in pixels) // len(pixels)
@@ -188,8 +232,8 @@ def detect_face_colors(
     colors: list[str] = []
     all_point_colors: list[list[str]] = []
 
-    for cell_idx, ((row, col), cell_samples, point_labs) in enumerate(
-        zip([(r, c) for r in range(3) for c in range(3)], per_cell_points, per_cell_labs)
+    for cell_idx, ((row, col), _cell_samples, point_labs) in enumerate(
+        zip([(r, c) for r in range(3) for c in range(3)], per_cell_points, per_cell_labs, strict=True)
     ):
         point_colors = [classify_lab(lab, refs) for lab in point_labs]
         all_point_colors.append(point_colors)
@@ -212,9 +256,19 @@ def detect_face_colors(
         colors[4] = override_centre
 
     face_label = colors[4] if len(colors) == 9 else "?"
+
+    # per_cell_points were sampled in the rotated frame (see rotation above). image, the
+    # base _annotate_image() draws on, is the original unrotated photo — map the sample
+    # points back to that frame so the overlay lines up with what's actually shown.
+    rotation_centre = (width / 2, height / 2)
+    unrotated_points = [
+        [_unrotate_point(pt, total_pil_angle, rotation_centre) for pt in cell_points]
+        for cell_points in per_cell_points
+    ]
+
     annotated = _annotate_image(
         image, crop_box, box_offset, colors,
-        per_cell_points, all_point_colors,
+        unrotated_points, all_point_colors,
         cell_w, cell_h, lab_readings_raw,
     )
 
@@ -271,11 +325,11 @@ def _annotate_image(
     corner_dot_r = max(2, centre_dot_r // 2)
 
     for cell_idx, (color, cell_samples, point_colors) in enumerate(
-        zip(colors, per_cell_points, all_point_colors)
+        zip(colors, per_cell_points, all_point_colors, strict=True)
     ):
         winning_rgb = OVERLAY_COLORS.get(color, (255, 0, 255))
 
-        for pt_idx, ((px, py), pt_color) in enumerate(zip(cell_samples, point_colors)):
+        for pt_idx, ((px, py), pt_color) in enumerate(zip(cell_samples, point_colors, strict=True)):
             ax = ox + px
             ay = oy + py
             pt_rgb = OVERLAY_COLORS.get(pt_color, (255, 0, 255))
@@ -379,7 +433,7 @@ def calibrate_faces(face_scans: dict[str, FaceScan]) -> CalibrationResult:
         anchors: dict[str, tuple[float, float, float]],
     ) -> list[str | None]:
         assigned: list[str | None] = [None] * len(stickers)
-        count = {c: 0 for c in colour_order}
+        count = dict.fromkeys(colour_order, 0)
         # Centre stickers (cell index 4) are known data points — lock them first.
         for si, (fl, ci, _, _) in enumerate(stickers):
             if ci == 4:
@@ -472,13 +526,31 @@ def calibrate_faces(face_scans: dict[str, FaceScan]) -> CalibrationResult:
     )
 
 
-def generate_summary_image(
-    face_images: dict[str, bytes],
-    face_order: list[str] | None = None,
-) -> bytes:
-    """Compose up to 6 face annotated images into a 3×2 summary grid."""
-    order = face_order or ["W", "Y", "R", "O", "B", "G"]
-    cols, rows = 3, 2
+_SUMMARY_NET_POSITIONS: dict[str, tuple[int, int]] = {
+    # (col, row) in a 4×3 grid — the unfolded cube net used throughout
+    # docs/orientation.md and _cube_net() in sensor.py:
+    #        W
+    #    O  G  R  B
+    #        Y
+    # W/Y align with G's column (not centred across the row) — matching the physical
+    # net, since W's bottom edge touches G's top edge when folded.
+    "W": (1, 0),
+    "O": (0, 1), "G": (1, 1), "R": (2, 1), "B": (3, 1),
+    "Y": (1, 2),
+}
+
+
+def generate_summary_image(face_images: dict[str, bytes]) -> bytes:
+    """Compose face annotated images into a cross-shaped cube net (see _SUMMARY_NET_POSITIONS).
+
+    Each thumbnail is rotated by FACE_SCAN_ROTATIONS before compositing. The individual
+    per-face images (face_images values) are deliberately left in their raw, as-captured
+    orientation elsewhere (for sanity-checking the overlay against the real camera frame),
+    but that means each face is rotated differently (0/90/180°) — stacked side by side in
+    one summary they'd look inconsistent/upside-down relative to each other. Rotating here
+    brings all six into the same canonical orientation used for classification.
+    """
+    cols, rows = 4, 3
     thumb_w, thumb_h = 160, 120
     pad = 4
     label_h = 16
@@ -495,17 +567,22 @@ def generate_summary_image(
     except OSError:
         font = ImageFont.load_default()
 
-    for i, face_label in enumerate(order):
+    for face_label, (col, row) in _SUMMARY_NET_POSITIONS.items():
         if face_label not in face_images:
             continue
-        col = i % cols
-        row = i // cols
         x = pad + col * (thumb_w + pad)
         y = pad + row * (thumb_h + label_h + pad)
 
-        thumb = Image.open(io.BytesIO(face_images[face_label])).resize(
-            (thumb_w, thumb_h), Image.LANCZOS
-        )
+        thumb = Image.open(io.BytesIO(face_images[face_label]))
+        angle = FACE_SCAN_ROTATIONS.get(face_label, 0)
+        if angle % 360:
+            # expand=False, matching detect_face_colors() — keeps the same canvas shape
+            # so the resize below doesn't distort 90°-rotated (O/R) thumbnails relative
+            # to the 0°/180° ones (expand=True would swap width/height for a 90°
+            # rotation, stretching it when forced back into a fixed landscape box).
+            thumb = thumb.rotate(angle, expand=False, fillcolor=(30, 30, 30))
+        thumb = thumb.resize((thumb_w, thumb_h), Image.LANCZOS)
+
         label_rgb = OVERLAY_COLORS.get(face_label, (200, 200, 200))
         draw.rectangle([(x, y), (x + thumb_w, y + label_h - 1)], fill=(20, 20, 20))
         draw.text((x + 4, y + 2), face_label, fill=label_rgb, font=font)

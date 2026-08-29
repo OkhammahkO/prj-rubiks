@@ -9,7 +9,13 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.storage import Store
 
-from .const import DEVICE_MANUFACTURER, DEVICE_MODEL, DOMAIN, LED_ENTITY_ID
+from .const import (
+    DEVICE_MANUFACTURER,
+    DEVICE_MODEL,
+    DOMAIN,
+    INTEGRATION_VERSION,
+    LED_ENTITY_ID,
+)
 
 _STORAGE_VERSION = 1
 
@@ -36,6 +42,7 @@ class LedEntityIdText(TextEntity):
         key=LED_ENTITY_ID,
         translation_key=LED_ENTITY_ID,
         pattern=r"^(light\.[a-z0-9_]+)?$",
+        icon="mdi:led-strip-variant",
     )
 
     def __init__(
@@ -55,6 +62,7 @@ class LedEntityIdText(TextEntity):
             identifiers={(DOMAIN, entry.entry_id)},
             name=DEVICE_MODEL,
             manufacturer=DEVICE_MANUFACTURER,
+            sw_version=INTEGRATION_VERSION,
         )
 
     async def async_set_value(self, value: str) -> None:
