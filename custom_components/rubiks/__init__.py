@@ -18,9 +18,11 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
 ]
 
-_ROBOT_SCAN_FACE_SCHEMA = vol.Schema({
-    vol.Required("face"): vol.In(SCAN_SEQUENCE),
-})
+_ROBOT_SCAN_FACE_SCHEMA = vol.Schema(
+    {
+        vol.Required("face"): vol.In(SCAN_SEQUENCE),
+    }
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -29,15 +31,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     cal_store = await CalibrationStore.create(hass, entry.entry_id)
     hass.data[DOMAIN][entry.entry_id] = {
         "scanned_faces": {},
-        "face_scans": {},            # face_label -> FaceScan (colours + lab_readings)
-        "face_annotated_images": {}, # face_label -> annotated JPEG bytes
+        "face_scans": {},  # face_label -> FaceScan (colours + lab_readings)
+        "face_annotated_images": {},  # face_label -> annotated JPEG bytes
         "calibration_result": None,
         "summary_image": None,
         "last_annotated_image": None,
         "image_size": None,
         "scan_warnings": [],
         "crop_entities": {},
-        "led_entity_id": entry.options.get(LED_ENTITY_ID) or entry.data.get(LED_ENTITY_ID),
+        "led_entity_id": entry.options.get(LED_ENTITY_ID)
+        or entry.data.get(LED_ENTITY_ID),
         "led_brightness_entity": None,
         "led_stabilise_delay_entity": None,
         "scramble_move_count_entity": None,
@@ -48,6 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
 
     if not hass.services.has_service(DOMAIN, "robot_scan_face"):
+
         async def _robot_scan_face(call: ServiceCall) -> None:
             await async_handle_robot_scan_face(hass, call)
 
@@ -56,14 +60,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
 
     if not hass.services.has_service(DOMAIN, "solve"):
+
         async def _solve(call: ServiceCall) -> dict:
             entries = hass.config_entries.async_entries(DOMAIN)
             if not entries:
-                return {"solution": "", "move_count": 0, "error": "Integration not configured"}
+                return {
+                    "solution": "",
+                    "move_count": 0,
+                    "error": "Integration not configured",
+                }
             data = hass.data[DOMAIN].get(entries[0].entry_id, {})
             result = await async_handle_solve(hass, data)
             if result is None:
-                return {"solution": "", "move_count": 0, "error": "Solve failed — check logs"}
+                return {
+                    "solution": "",
+                    "move_count": 0,
+                    "error": "Solve failed — check logs",
+                }
             return result
 
         hass.services.async_register(

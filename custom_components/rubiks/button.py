@@ -57,21 +57,45 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_BUTTON = ButtonEntityDescription(key="scan_face", translation_key="scan_face", icon="mdi:camera-iris")
-ROBOT_START_BUTTON = ButtonEntityDescription(key="robot_start_scan", translation_key="robot_start_scan", icon="mdi:cube-scan")
-ROBOT_STOP_BUTTON = ButtonEntityDescription(key="robot_stop", translation_key="robot_stop", icon="mdi:stop-circle-outline")
-ROBOT_ABORT_BUTTON = ButtonEntityDescription(key="robot_abort", translation_key="robot_abort", icon="mdi:alert-octagon-outline")
-ROBOT_ADVANCE_BUTTON = ButtonEntityDescription(key="robot_advance_face", translation_key="robot_advance_face", icon="mdi:arrow-right-circle-outline")
-PREVIEW_BUTTON = ButtonEntityDescription(key="preview_crop", translation_key="preview_crop", icon="mdi:eye-outline")
-RESET_BUTTON = ButtonEntityDescription(key="reset_scan", translation_key="reset_scan", icon="mdi:restart")
+SCAN_BUTTON = ButtonEntityDescription(
+    key="scan_face", translation_key="scan_face", icon="mdi:camera-iris"
+)
+ROBOT_START_BUTTON = ButtonEntityDescription(
+    key="robot_start_scan", translation_key="robot_start_scan", icon="mdi:cube-scan"
+)
+ROBOT_STOP_BUTTON = ButtonEntityDescription(
+    key="robot_stop", translation_key="robot_stop", icon="mdi:stop-circle-outline"
+)
+ROBOT_ABORT_BUTTON = ButtonEntityDescription(
+    key="robot_abort", translation_key="robot_abort", icon="mdi:alert-octagon-outline"
+)
+ROBOT_ADVANCE_BUTTON = ButtonEntityDescription(
+    key="robot_advance_face",
+    translation_key="robot_advance_face",
+    icon="mdi:arrow-right-circle-outline",
+)
+PREVIEW_BUTTON = ButtonEntityDescription(
+    key="preview_crop", translation_key="preview_crop", icon="mdi:eye-outline"
+)
+RESET_BUTTON = ButtonEntityDescription(
+    key="reset_scan", translation_key="reset_scan", icon="mdi:restart"
+)
 SAVE_CAL_BUTTON = ButtonEntityDescription(
-    key="save_calibration", translation_key="save_calibration", icon="mdi:content-save-outline"
+    key="save_calibration",
+    translation_key="save_calibration",
+    icon="mdi:content-save-outline",
 )
 RESET_CAL_BUTTON = ButtonEntityDescription(
-    key="reset_calibration", translation_key="reset_calibration", icon="mdi:backup-restore"
+    key="reset_calibration",
+    translation_key="reset_calibration",
+    icon="mdi:backup-restore",
 )
-SOLVE_BUTTON = ButtonEntityDescription(key="solve", translation_key="solve", icon="mdi:lightbulb-on-outline")
-SCRAMBLE_BUTTON = ButtonEntityDescription(key="scramble", translation_key="scramble", icon="mdi:dice-multiple-outline")
+SOLVE_BUTTON = ButtonEntityDescription(
+    key="solve", translation_key="solve", icon="mdi:lightbulb-on-outline"
+)
+SCRAMBLE_BUTTON = ButtonEntityDescription(
+    key="scramble", translation_key="scramble", icon="mdi:dice-multiple-outline"
+)
 
 _LAB_WARN_THRESHOLD = 20.0
 
@@ -82,22 +106,25 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Rubiks button entities."""
-    async_add_entities([
-        ScanFaceButton(hass, entry),
-        PreviewCropButton(hass, entry),
-        ResetScanButton(hass, entry),
-        SaveCalibrationButton(hass, entry),
-        ResetCalibrationButton(hass, entry),
-        SolveButton(hass, entry),
-        RobotStartScanButton(hass, entry),
-        RobotStopButton(hass, entry),
-        RobotAbortButton(hass, entry),
-        RobotAdvanceFaceButton(hass, entry),
-        ScrambleButton(hass, entry),
-    ])
+    async_add_entities(
+        [
+            ScanFaceButton(hass, entry),
+            PreviewCropButton(hass, entry),
+            ResetScanButton(hass, entry),
+            SaveCalibrationButton(hass, entry),
+            ResetCalibrationButton(hass, entry),
+            SolveButton(hass, entry),
+            RobotStartScanButton(hass, entry),
+            RobotStopButton(hass, entry),
+            RobotAbortButton(hass, entry),
+            RobotAdvanceFaceButton(hass, entry),
+            ScrambleButton(hass, entry),
+        ]
+    )
 
 
 # ── Module-level helpers (shared by button entities and service handler) ──────
+
 
 def generate_scramble(move_count: int) -> str:
     """Generate a random scramble string, e.g. "U1 R2 F3 D1 ...".
@@ -178,7 +205,9 @@ def _update_crop_max(data: dict, width: int, height: int) -> None:
             entity.update_max(height)
 
 
-async def _async_save_annotated(hass: HomeAssistant, data: dict, image_bytes: bytes) -> None:
+async def _async_save_annotated(
+    hass: HomeAssistant, data: dict, image_bytes: bytes
+) -> None:
     """Store annotated image in shared data and www/."""
     data["last_annotated_image"] = image_bytes
     www_path = hass.config.path("www")
@@ -207,8 +236,7 @@ async def _async_load_image(
     source = entry.data[CONF_SOURCE]
     if source == SOURCE_CAMERA:
         camera_entity_id = (
-            entry.options.get(CONF_CAMERA_ENTITY)
-            or entry.data[CONF_CAMERA_ENTITY]
+            entry.options.get(CONF_CAMERA_ENTITY) or entry.data[CONF_CAMERA_ENTITY]
         )
         # Discard first snapshot — camera idles at 0.1 fps so the buffer may
         # hold a stale frame from before the LED came on or the cube settled.
@@ -217,10 +245,7 @@ async def _async_load_image(
         image_bytes = await _async_get_camera_snapshot(hass, camera_entity_id)
         image = await hass.async_add_executor_job(load_image_from_bytes, image_bytes)
     else:
-        path = (
-            entry.options.get(CONF_SAMPLE_IMAGE)
-            or entry.data[CONF_SAMPLE_IMAGE]
-        )
+        path = entry.options.get(CONF_SAMPLE_IMAGE) or entry.data[CONF_SAMPLE_IMAGE]
         image = await hass.async_add_executor_job(load_image_from_path, path)
     w, h = image.size
     data["image_size"] = (w, h)
@@ -291,9 +316,7 @@ async def _async_run_calibration(
     )
 
 
-async def async_handle_robot_scan_face(
-    hass: HomeAssistant, call: ServiceCall
-) -> None:
+async def async_handle_robot_scan_face(hass: HomeAssistant, call: ServiceCall) -> None:
     """Handle the rubiks.robot_scan_face service call.
 
     Expects {face: "W"} from the esphome.rubiks_face_ready event payload.
@@ -315,7 +338,9 @@ async def async_handle_robot_scan_face(
 
     scanned: dict = data["scanned_faces"]
     if face in scanned:
-        _LOGGER.warning("robot_scan_face: face %s already scanned — call reset first", face)
+        _LOGGER.warning(
+            "robot_scan_face: face %s already scanned — call reset first", face
+        )
         return
 
     try:
@@ -327,7 +352,12 @@ async def async_handle_robot_scan_face(
     cal_store = data.get("cal_store")
     refs = cal_store.get_references() if cal_store else None
     scan = await hass.async_add_executor_job(
-        detect_face_colors, image, _get_crop_box(data), refs, face, _get_rotation(data),
+        detect_face_colors,
+        image,
+        _get_crop_box(data),
+        refs,
+        face,
+        _get_rotation(data),
     )
 
     if len(scan.lab_readings) >= 5:
@@ -338,7 +368,9 @@ async def async_handle_robot_scan_face(
             _LOGGER.warning(
                 "robot_scan_face: face %s centre LAB(%.1f,%.1f,%.1f) is %.1f units "
                 "from expected reference — verify robot arm position.",
-                face, *centre_lab, dist,
+                face,
+                *centre_lab,
+                dist,
             )
 
     if scan.has_unknowns:
@@ -369,6 +401,7 @@ async def async_handle_robot_scan_face(
 
 
 # ── Base entity class ─────────────────────────────────────────────────────────
+
 
 class RubiksButtonBase(ButtonEntity):
     """Base class with shared image loading and annotated image saving."""
@@ -413,6 +446,7 @@ class RubiksButtonBase(ButtonEntity):
 
 # ── Button entities ───────────────────────────────────────────────────────────
 
+
 class ScanFaceButton(RubiksButtonBase):
     """Button to trigger scanning of the current cube face."""
 
@@ -443,7 +477,11 @@ class ScanFaceButton(RubiksButtonBase):
         cal_store = data.get("cal_store")
         refs = cal_store.get_references() if cal_store else None
         scan = await self.hass.async_add_executor_job(
-            detect_face_colors, image, self._get_crop_box(), refs, face_label,
+            detect_face_colors,
+            image,
+            self._get_crop_box(),
+            refs,
+            face_label,
             _get_rotation(data),
         )
 
@@ -455,7 +493,9 @@ class ScanFaceButton(RubiksButtonBase):
                 _LOGGER.warning(
                     "Face %s: centre LAB(%.1f, %.1f, %.1f) is %.1f units from expected "
                     "reference — verify cube orientation.",
-                    face_label, *centre_lab, dist,
+                    face_label,
+                    *centre_lab,
+                    dist,
                 )
 
         if scan.has_unknowns:
@@ -505,7 +545,9 @@ class PreviewCropButton(RubiksButtonBase):
             self.hass.async_create_task(_do_preview())
         else:
             self.async_on_remove(
-                self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _do_preview)
+                self.hass.bus.async_listen_once(
+                    EVENT_HOMEASSISTANT_STARTED, _do_preview
+                )
             )
 
     async def async_press(self) -> None:  # type: ignore[override]
@@ -520,7 +562,11 @@ class PreviewCropButton(RubiksButtonBase):
         cal_store = data.get("cal_store")
         refs = cal_store.get_references() if cal_store else None
         scan = await self.hass.async_add_executor_job(
-            detect_face_colors, image, self._get_crop_box(), refs, None,
+            detect_face_colors,
+            image,
+            self._get_crop_box(),
+            refs,
+            None,
             _get_rotation(self._data()),
         )
         await self._save_annotated(scan.annotated_image)
@@ -589,12 +635,16 @@ class SaveCalibrationButton(RubiksButtonBase):
         result = data.get("calibration_result")
         cal_store = data.get("cal_store")
         if result is None:
-            _LOGGER.warning("Save Calibration pressed but no calibration result available.")
+            _LOGGER.warning(
+                "Save Calibration pressed but no calibration result available."
+            )
             return
         if cal_store is None:
             return
         await cal_store.hard_commit(result.anchors)
-        self.hass.bus.async_fire(f"{DOMAIN}_calibration_saved", {"anchors": result.anchors})
+        self.hass.bus.async_fire(
+            f"{DOMAIN}_calibration_saved", {"anchors": result.anchors}
+        )
         _LOGGER.info("Calibration manually saved.")
 
 
@@ -618,9 +668,7 @@ class ResetCalibrationButton(RubiksButtonBase):
         self.hass.bus.async_fire(f"{DOMAIN}_calibration_reset", {})
 
 
-async def async_handle_solve(
-    hass: HomeAssistant, data: dict
-) -> dict | None:
+async def async_handle_solve(hass: HomeAssistant, data: dict) -> dict | None:
     """Run kociemba solver on scanned cube state.
 
     Returns {"solution": str, "move_count": int, "cube_string": str} or None on failure.
@@ -628,7 +676,9 @@ async def async_handle_solve(
     """
     kociemba_faces = data.get("kociemba_faces")
     if not kociemba_faces:
-        _LOGGER.warning("Solve called but no kociemba face data — scan all 6 faces first.")
+        _LOGGER.warning(
+            "Solve called but no kociemba face data — scan all 6 faces first."
+        )
         return None
 
     cube_str = kociemba_string(kociemba_faces)
@@ -681,6 +731,7 @@ def _write_file(path: str, data: bytes) -> None:
 # These fire HA events consumed by ha_automations/rubiks_robot.yaml, which
 # translates them to ESPHome service calls. This keeps ESPHome service names
 # (device-specific) out of the Python component.
+
 
 class RobotStartScanButton(RubiksButtonBase):
     """Reset HA scan state and signal the robot to start a scan sequence."""
@@ -772,7 +823,9 @@ class ScrambleButton(RubiksButtonBase):
 
     async def async_press(self) -> None:  # type: ignore[override]
         count_entity = self._data().get("scramble_move_count_entity")
-        move_count = count_entity.move_count if count_entity else SCRAMBLE_MOVE_COUNT_DEFAULT
+        move_count = (
+            count_entity.move_count if count_entity else SCRAMBLE_MOVE_COUNT_DEFAULT
+        )
         scramble = generate_scramble(move_count)
         self.hass.bus.async_fire(f"{DOMAIN}_scramble_requested", {"solution": scramble})
         _LOGGER.info("Scramble requested: %s (%d moves)", scramble, move_count)

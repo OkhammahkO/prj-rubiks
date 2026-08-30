@@ -48,12 +48,22 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.mypy]
-python_version = "3.12"
+# Not a public compatibility claim (see requires-python above) — this just needs to
+# match the actual dev interpreter (3.14) so mypy can parse the local HA core
+# checkout's own syntax (homeassistant/config_entries.py uses both PEP 696 type
+# parameter defaults [3.13+] and PEP 758 parenthesis-free except [3.14+]).
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 show_error_codes = true
+# custom_components/rubiks is also reachable via a symlink from the local HA core
+# checkout's config/custom_components/ (see CLAUDE.md dev setup) — without this, mypy
+# discovers the same files under two module names ("rubiks.*" vs
+# "custom_components.rubiks.*") and refuses to check anything.
+explicit_package_bases = true
+mypy_path = "."
 
 [tool.pytest.ini_options]
 testpaths = ["custom_components/rubiks/tests"]

@@ -157,9 +157,13 @@ async def async_setup_entry(
     led_stabilise_delay = LedStabiliseDelayEntity(
         hass, entry, delay_saved.get(LED_STABILISE_DELAY, 0.3), delay_store
     )
-    hass.data[DOMAIN][entry.entry_id]["led_stabilise_delay_entity"] = led_stabilise_delay
+    hass.data[DOMAIN][entry.entry_id]["led_stabilise_delay_entity"] = (
+        led_stabilise_delay
+    )
 
-    scramble_store = Store(hass, _STORAGE_VERSION, f"{DOMAIN}_scramble_{entry.entry_id}")
+    scramble_store = Store(
+        hass, _STORAGE_VERSION, f"{DOMAIN}_scramble_{entry.entry_id}"
+    )
     scramble_saved: dict[str, float] = await scramble_store.async_load() or {}
 
     scramble_move_count = ScrambleMoveCountEntity(
@@ -168,12 +172,19 @@ async def async_setup_entry(
         scramble_saved.get(SCRAMBLE_MOVE_COUNT, float(SCRAMBLE_MOVE_COUNT_DEFAULT)),
         scramble_store,
     )
-    hass.data[DOMAIN][entry.entry_id]["scramble_move_count_entity"] = scramble_move_count
+    hass.data[DOMAIN][entry.entry_id]["scramble_move_count_entity"] = (
+        scramble_move_count
+    )
 
-    async_add_entities([
-        CropNumberEntity(hass, entry, desc, crop_saved.get(desc.key, default), crop_store)
-        for desc, default in CROP_ENTITIES
-    ] + [led_brightness, led_stabilise_delay, scramble_move_count])
+    async_add_entities(
+        [
+            CropNumberEntity(
+                hass, entry, desc, crop_saved.get(desc.key, default), crop_store
+            )
+            for desc, default in CROP_ENTITIES
+        ]
+        + [led_brightness, led_stabilise_delay, scramble_move_count]
+    )
 
 
 class CropNumberEntity(NumberEntity):
@@ -219,15 +230,17 @@ class CropNumberEntity(NumberEntity):
 
     async def _persist(self) -> None:
         """Write all crop values to storage."""
-        entities: dict = self.hass.data[DOMAIN][self._entry.entry_id].get("crop_entities", {})
-        await self._store.async_save({
-            key: entity._attr_native_value for key, entity in entities.items()
-        })
+        entities: dict = self.hass.data[DOMAIN][self._entry.entry_id].get(
+            "crop_entities", {}
+        )
+        await self._store.async_save(
+            {key: entity._attr_native_value for key, entity in entities.items()}
+        )
 
     def update_max(self, max_value: int) -> None:
         """Update the slider maximum to match image dimensions."""
         self._attr_native_max_value = max_value
-        if self._attr_native_value > max_value:
+        if self._attr_native_value is not None and self._attr_native_value > max_value:
             self._attr_native_value = float(max_value)
         self.async_write_ha_state()
 

@@ -89,32 +89,67 @@ ROBOT_CAMERA_TO_KOCIEMBA_REMAP: dict[str, list[int]] = {
     "B": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — raw cam already matches kociemba B
     "Y": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — FACE_SCAN_ROTATIONS 180° handles it
     "G": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — FACE_SCAN_ROTATIONS 180° handles it
-    "O": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — FACE_SCAN_ROTATIONS 90° CCW handles it
-    "R": [0, 1, 2, 3, 4, 5, 6, 7, 8],  # identity — FACE_SCAN_ROTATIONS 90° CCW handles it
+    "O": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+    ],  # identity — FACE_SCAN_ROTATIONS 90° CCW handles it
+    "R": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+    ],  # identity — FACE_SCAN_ROTATIONS 90° CCW handles it
 }
 
 # Edge positions: each entry is (face1, index1, face2, index2).
 # Both positions belong to the same physical edge piece.
 _EDGE_POSITIONS: list[tuple[str, int, str, int]] = [
-    ("U", 7, "F", 1), ("U", 5, "R", 1), ("U", 1, "B", 1), ("U", 3, "L", 1),
-    ("D", 1, "F", 7), ("D", 5, "R", 7), ("D", 7, "B", 7), ("D", 3, "L", 7),
-    ("F", 5, "R", 3), ("F", 3, "L", 5), ("B", 3, "R", 5), ("B", 5, "L", 3),
+    ("U", 7, "F", 1),
+    ("U", 5, "R", 1),
+    ("U", 1, "B", 1),
+    ("U", 3, "L", 1),
+    ("D", 1, "F", 7),
+    ("D", 5, "R", 7),
+    ("D", 7, "B", 7),
+    ("D", 3, "L", 7),
+    ("F", 5, "R", 3),
+    ("F", 3, "L", 5),
+    ("B", 3, "R", 5),
+    ("B", 5, "L", 3),
 ]
 
 # Corner positions: each entry is (face1, index1, face2, index2, face3, index3).
 _CORNER_POSITIONS: list[tuple[str, int, str, int, str, int]] = [
-    ("U", 8, "F", 2, "R", 0), ("U", 6, "F", 0, "L", 2),
-    ("U", 2, "B", 0, "R", 2), ("U", 0, "B", 2, "L", 0),
-    ("D", 2, "F", 8, "R", 6), ("D", 0, "F", 6, "L", 8),
-    ("D", 8, "B", 6, "R", 8), ("D", 6, "B", 8, "L", 6),
+    ("U", 8, "F", 2, "R", 0),
+    ("U", 6, "F", 0, "L", 2),
+    ("U", 2, "B", 0, "R", 2),
+    ("U", 0, "B", 2, "L", 0),
+    ("D", 2, "F", 8, "R", 6),
+    ("D", 0, "F", 6, "L", 8),
+    ("D", 8, "B", 6, "R", 8),
+    ("D", 6, "B", 8, "L", 6),
 ]
 
 # Pairs of opposite faces — no edge or corner can contain both.
-_OPPOSITE_PAIRS: frozenset[frozenset[str]] = frozenset([
-    frozenset(["U", "D"]),
-    frozenset(["F", "B"]),
-    frozenset(["L", "R"]),
-])
+_OPPOSITE_PAIRS: frozenset[frozenset[str]] = frozenset(
+    [
+        frozenset(["U", "D"]),
+        frozenset(["F", "B"]),
+        frozenset(["L", "R"]),
+    ]
+)
 
 
 def build_kociemba_faces(
@@ -196,9 +231,7 @@ def diagnose_cube_string(cube_string: str) -> list[str]:
     # Centre squares
     for face, stickers in faces.items():
         if stickers[4] != face:
-            issues.append(
-                f"{face} face centre is '{stickers[4]}', expected '{face}'"
-            )
+            issues.append(f"{face} face centre is '{stickers[4]}', expected '{face}'")
 
     # Colour counts
     counts = Counter(cube_string)
@@ -229,11 +262,23 @@ def diagnose_cube_string(cube_string: str) -> list[str]:
                 f"(at {', '.join(slots)}) — one or more stickers misclassified"
             )
 
-    expected_edges = {frozenset(p) for p in [
-        ("U","F"),("U","R"),("U","B"),("U","L"),
-        ("D","F"),("D","R"),("D","B"),("D","L"),
-        ("F","R"),("F","L"),("B","R"),("B","L"),
-    ]}
+    expected_edges = {
+        frozenset(p)
+        for p in [
+            ("U", "F"),
+            ("U", "R"),
+            ("U", "B"),
+            ("U", "L"),
+            ("D", "F"),
+            ("D", "R"),
+            ("D", "B"),
+            ("D", "L"),
+            ("F", "R"),
+            ("F", "L"),
+            ("B", "R"),
+            ("B", "L"),
+        ]
+    }
     missing_edges = expected_edges - set(edge_pieces.keys())
     if missing_edges:
         for piece in missing_edges:
@@ -292,7 +337,9 @@ def solve(cube_string: str) -> str | None:
     try:
         import kociemba  # noqa: PLC0415
     except ImportError:
-        _LOGGER.error("kociemba library not installed — add it to manifest requirements")
+        _LOGGER.error(
+            "kociemba library not installed — add it to manifest requirements"
+        )
         return None
     try:
         return kociemba.solve(cube_string)

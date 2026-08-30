@@ -7,7 +7,9 @@ DOMAIN = "rubiks"
 
 # Read from manifest.json so there's a single source of truth for the version shown
 # in each entity's device info page — bump manifest.json, nothing else.
-INTEGRATION_VERSION = json.loads((Path(__file__).parent / "manifest.json").read_text())["version"]
+INTEGRATION_VERSION = json.loads((Path(__file__).parent / "manifest.json").read_text())[
+    "version"
+]
 
 # Config entry keys
 CONF_SOURCE = "source"

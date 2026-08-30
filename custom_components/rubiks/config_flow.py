@@ -130,11 +130,7 @@ class RubiksConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="sample",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_SAMPLE_IMAGE): TextSelector()
-                }
-            ),
+            data_schema=vol.Schema({vol.Required(CONF_SAMPLE_IMAGE): TextSelector()}),
             errors=errors,
         )
 
@@ -174,12 +170,12 @@ class RubiksOptionsFlow(OptionsFlow):
             )
             schema = vol.Schema(
                 {
-                    vol.Required(CONF_CAMERA_ENTITY, default=current_cam): EntitySelector(
-                        EntitySelectorConfig(domain=CAMERA_DOMAIN)
-                    ),
-                    vol.Optional(LED_ENTITY_ID, default=current_led or ""): EntitySelector(
-                        EntitySelectorConfig(domain="light")
-                    ),
+                    vol.Required(
+                        CONF_CAMERA_ENTITY, default=current_cam
+                    ): EntitySelector(EntitySelectorConfig(domain=CAMERA_DOMAIN)),
+                    vol.Optional(
+                        LED_ENTITY_ID, default=current_led or ""
+                    ): EntitySelector(EntitySelectorConfig(domain="light")),
                 }
             )
         else:
@@ -188,9 +184,7 @@ class RubiksOptionsFlow(OptionsFlow):
                 self.config_entry.data.get(CONF_SAMPLE_IMAGE),
             )
             schema = vol.Schema(
-                {
-                    vol.Required(CONF_SAMPLE_IMAGE, default=current): TextSelector()
-                }
+                {vol.Required(CONF_SAMPLE_IMAGE, default=current): TextSelector()}
             )
 
         return self.async_show_form(

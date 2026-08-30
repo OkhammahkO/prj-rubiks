@@ -2,7 +2,10 @@ esphome:
   name: rubiks-solver
   project:
     name: "okhammahko.rubiks_solver"
-    version: "0.4.5"
+    version: "0.4.12"
+  on_boot:
+    then:
+      - script.execute: show_boot_text
 
 esp32:
   framework:
@@ -34,6 +37,8 @@ esp32:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  fast_connect: true
+  power_save_mode: none
   manual_ip:
     static_ip: 192.168.1.143
     gateway: 192.168.1.1
@@ -68,11 +73,17 @@ display:
   update_interval: 500ms
 
   lambda: |-
-    // While solving, show the moves countdown.
-    // Otherwise show the plain status text (IDLE, SCAN N, FACE N, HOMING, ...).
+    // Priority order: boot splash > connect confirmation > API lost > moves
+    // countdown while solving > plain status text (IDLE, SCAN N, FACE N, HOMING, ...).
     std::string s;
     bool solving = id(solver_status_text).has_state() && id(solver_status_text).state == "SOLVING";
-    if (solving && id(moves_remaining).has_state()) {
+    if (id(g_show_boot)) {
+      s = "RUBEE";
+    } else if (id(g_show_ready)) {
+      s = "READY";
+    } else if (!global_api_server->is_connected()) {
+      s = "LOST API";
+    } else if (solving && id(moves_remaining).has_state()) {
       char buf[9];
       snprintf(buf, sizeof(buf), "LEFT%3d", (int) id(moves_remaining).state);
       s = buf;
@@ -84,6 +95,18 @@ display:
 
 api:
   homeassistant_services: true
+  # Display feedback for HA connectivity — see the display lambda above for the
+  # RUBEE/READY/LOST API priority chain. LED blink state is owned entirely by the
+  # interval watchdog below (raw connection state); this trigger is purely about the
+  # READY confirmation, gated on actually being *subscribed* (not just connected) —
+  # a bare connection can briefly exist before HA has finished subscribing, the same
+  # gap that caused homeassistant.action calls to get silently dropped earlier.
+  on_client_connected:
+    - wait_until:
+        condition:
+          api.connected:
+            state_subscription_only: true
+    - script.execute: show_ready_briefly
   actions:
     - action: start_scan
       then:
@@ -127,6 +150,72 @@ globals:
     type: int
     restore_value: no
     initial_value: "0"
+  - id: g_show_boot # True for the first few seconds after boot — shows RUBEE.
+    type: bool
+    restore_value: no
+    initial_value: "true"
+  - id: g_show_ready # True briefly right after the API connects — shows READY.
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+# Sole owner of api_lost_blink's start/stop — a plain event trigger would miss a cold
+# boot that hasn't connected even once yet (no prior connection to "lose"), so this
+# polls the live connection state instead. is_running() guards make both branches
+# idempotent regardless of how many consecutive ticks see the same state.
+interval:
+  - interval: 1s
+    then:
+      # LED 8 — solid on while connected, blinks while disconnected.
+      - if:
+          condition:
+            lambda: "return !global_api_server->is_connected() && !id(api_lost_blink).is_running();"
+          then:
+            - script.execute: api_lost_blink
+      - if:
+          condition:
+            lambda: "return global_api_server->is_connected() && id(api_lost_blink).is_running();"
+          then:
+            - script.stop: api_lost_blink
+      - if:
+          condition:
+            lambda: "return !id(api_lost_blink).is_running();"
+          then:
+            - if:
+                condition:
+                  lambda: "return global_api_server->is_connected();"
+                then:
+                  - switch.turn_on: tm1638_led_8
+                else:
+                  - switch.turn_off: tm1638_led_8
+
+      # LED 7 — solid on while believed home, blinks while IDLE-but-not-home, off
+      # otherwise (actively scanning/solving — not home yet, but not a problem either).
+      - if:
+          condition:
+            lambda: |-
+              return id(solver_status_text).state == "IDLE" && !id(believed_home).state
+                     && !id(not_home_blink).is_running();
+          then:
+            - script.execute: not_home_blink
+      - if:
+          condition:
+            lambda: |-
+              return !(id(solver_status_text).state == "IDLE" && !id(believed_home).state)
+                     && id(not_home_blink).is_running();
+          then:
+            - script.stop: not_home_blink
+      - if:
+          condition:
+            lambda: "return !id(not_home_blink).is_running();"
+          then:
+            - if:
+                condition:
+                  lambda: "return id(believed_home).state;"
+                then:
+                  - switch.turn_on: tm1638_led_7
+                else:
+                  - switch.turn_off: tm1638_led_7
 
 sensor:
   - platform: uptime
@@ -140,6 +229,14 @@ script:
     then:
       - rtttl.play:
           rtttl: "click:d=16,o=5,b=120:d6"
+
+  # Distinct low double-blip — plays on a rejected/failed homeassistant.action call,
+  # audibly different from beep_click so a rejected button press doesn't look
+  # identical to nothing happening.
+  - id: beep_error
+    then:
+      - rtttl.play:
+          rtttl: "err:d=16,o=4,b=120:c,p,c"
 
   # ── Flash a single TM1638 LED ───────────────────────────────────────────────
   - id: flash_led
@@ -158,6 +255,55 @@ script:
               id(tm1638_led_5), id(tm1638_led_6), id(tm1638_led_7), id(tm1638_led_8)};
           leds[idx]->turn_off();
 
+  # ── Boot / connectivity feedback ────────────────────────────────────────────────
+  - id: show_boot_text # Holds RUBEE on screen for 2s after boot, then clears it.
+    mode: restart
+    then:
+      - delay: 2s
+      - lambda: "id(g_show_boot) = false;"
+
+  - id: show_ready_briefly # Flashes READY for 2s right after the API connects.
+    mode: restart
+    then:
+      - lambda: "id(g_show_ready) = true;"
+      - delay: 2s
+      - lambda: "id(g_show_ready) = false;"
+
+  # ── Dedicated status dots (LED 7/8) ─────────────────────────────────────────────
+  # Both excluded from every shared scan/solve routine below — see the group switch's
+  # comment above. Both start/stop owned by the interval watchdog, not self-terminating
+  # or event-triggered, since there's no single sensor value to poll for either
+  # condition (they're each a compound/live check, not a status-text match).
+
+  # LED 8 — blinks while HA is disconnected.
+  - id: api_lost_blink
+    mode: restart
+    then:
+      - while:
+          condition:
+            lambda: "return true;"
+          then:
+            - switch.turn_on: tm1638_led_8
+            - delay: 200ms
+            - switch.turn_off: tm1638_led_8
+            - delay: 200ms
+
+  # LED 7 — blinks while IDLE but not believed home (test_scan_cycle() parked at a
+  # face, or a stop() that interrupted a non-IDLE sequence — see docs/servo-tuning.md
+  # "Believed-home safeguard"). Distinct from CHK ARM, which is the narrower
+  # unclean-reset case and already has its own status text + blink.
+  - id: not_home_blink
+    mode: restart
+    then:
+      - while:
+          condition:
+            lambda: "return true;"
+          then:
+            - switch.turn_on: tm1638_led_7
+            - delay: 200ms
+            - switch.turn_off: tm1638_led_7
+            - delay: 200ms
+
   # ── Status LED routines ───────────────────────────────────────────────────────
   - id: homing_led_collapse
     mode: restart
@@ -174,7 +320,7 @@ script:
       - delay: 100ms
       - switch.turn_off: tm1638_led_1
 
-  # SCAN END — one quick marquee chase across all 8, then off. A flourish marking
+  # SCAN END — one quick marquee chase across 1-6, then off. A flourish marking
   # "scan complete, handing off to solve".
   - id: scan_end_chase
     mode: restart
@@ -197,14 +343,9 @@ script:
       - switch.turn_on: tm1638_led_6
       - delay: 60ms
       - switch.turn_off: tm1638_led_6
-      - switch.turn_on: tm1638_led_7
-      - delay: 60ms
-      - switch.turn_off: tm1638_led_7
-      - switch.turn_on: tm1638_led_8
-      - delay: 60ms
-      - switch.turn_off: tm1638_led_8
 
-  # SOLVING — ping-pong chase across all 8, self-terminating when the solver_status_text
+  # SOLVING — ping-pong chase across 1-6, self-terminating when the solver_status_text
+  # leaves "SOLVING". 7/8 are dedicated status dots, excluded on purpose.
   - id: solving_led_sweep
     mode: restart
     then:
@@ -214,30 +355,26 @@ script:
             lambda: 'return id(solver_status_text).state == "SOLVING";'
           then:
             - lambda: |-
-                static switch_::Switch *const leds[8] = {
-                    id(tm1638_led_1), id(tm1638_led_2), id(tm1638_led_3), id(tm1638_led_4),
-                    id(tm1638_led_5), id(tm1638_led_6), id(tm1638_led_7), id(tm1638_led_8)};
-                const int period = 14;  // 2*(8-1) — full ping-pong cycle length
+                static switch_::Switch *const leds[6] = {
+                    id(tm1638_led_1), id(tm1638_led_2), id(tm1638_led_3),
+                    id(tm1638_led_4), id(tm1638_led_5), id(tm1638_led_6)};
+                const int period = 10;  // 2*(6-1) — full ping-pong cycle length
                 int pos = id(g_led_step) % period;
-                int idx = (pos < 8) ? pos : period - pos;
+                int idx = (pos < 6) ? pos : period - pos;
                 leds[idx]->turn_on();
             - delay: 80ms
             - lambda: |-
-                static switch_::Switch *const leds[8] = {
-                    id(tm1638_led_1), id(tm1638_led_2), id(tm1638_led_3), id(tm1638_led_4),
-                    id(tm1638_led_5), id(tm1638_led_6), id(tm1638_led_7), id(tm1638_led_8)};
-                const int period = 14;
+                static switch_::Switch *const leds[6] = {
+                    id(tm1638_led_1), id(tm1638_led_2), id(tm1638_led_3),
+                    id(tm1638_led_4), id(tm1638_led_5), id(tm1638_led_6)};
+                const int period = 10;
                 int pos = id(g_led_step) % period;
-                int idx = (pos < 8) ? pos : period - pos;
+                int idx = (pos < 6) ? pos : period - pos;
                 leds[idx]->turn_off();
                 id(g_led_step)++;
-      - lambda: |-
-          static switch_::Switch *const leds[8] = {
-              id(tm1638_led_1), id(tm1638_led_2), id(tm1638_led_3), id(tm1638_led_4),
-              id(tm1638_led_5), id(tm1638_led_6), id(tm1638_led_7), id(tm1638_led_8)};
-          for (int i = 0; i < 8; i++) leds[i]->turn_off();
+      - switch.turn_off: tm1638_leds_all
 
-  # DONE — a quick "all 8 on, then off" celebration. A flourish marking "solve complete".
+  # DONE — a quick "1-6 on, then off" celebration. A flourish marking "solve complete".
   - id: done_celebration
     mode: restart
     then:
@@ -259,18 +396,6 @@ script:
       - switch.turn_on: tm1638_led_6
       - delay: 40ms
       - switch.turn_off: tm1638_led_6
-      - switch.turn_on: tm1638_led_7
-      - delay: 40ms
-      - switch.turn_off: tm1638_led_7
-      - switch.turn_on: tm1638_led_8
-      - delay: 40ms
-      - switch.turn_off: tm1638_led_8
-      - switch.turn_on: tm1638_led_8
-      - delay: 40ms
-      - switch.turn_off: tm1638_led_8
-      - switch.turn_on: tm1638_led_7
-      - delay: 40ms
-      - switch.turn_off: tm1638_led_7
       - switch.turn_on: tm1638_led_6
       - delay: 40ms
       - switch.turn_off: tm1638_led_6
@@ -289,26 +414,12 @@ script:
       - switch.turn_on: tm1638_led_1
       - delay: 40ms
       - switch.turn_off: tm1638_led_1
-      - switch.turn_on: tm1638_led_1
-      - switch.turn_on: tm1638_led_2
-      - switch.turn_on: tm1638_led_3
-      - switch.turn_on: tm1638_led_4
-      - switch.turn_on: tm1638_led_5
-      - switch.turn_on: tm1638_led_6
-      - switch.turn_on: tm1638_led_7
-      - switch.turn_on: tm1638_led_8
+      - switch.turn_on: tm1638_leds_all
       - delay: 300ms
-      - switch.turn_off: tm1638_led_1
-      - switch.turn_off: tm1638_led_2
-      - switch.turn_off: tm1638_led_3
-      - switch.turn_off: tm1638_led_4
-      - switch.turn_off: tm1638_led_5
-      - switch.turn_off: tm1638_led_6
-      - switch.turn_off: tm1638_led_7
-      - switch.turn_off: tm1638_led_8
+      - switch.turn_off: tm1638_leds_all
 
-  # CHK ARM — a slow alternating blink of odd/even LEDs, self-terminating when the solver_status_text
-  #
+  # CHK ARM — a slow alternating blink of odd/even LEDs (1-6 only — 7/8 are dedicated
+  # status dots), self-terminating when the solver_status_text leaves "CHK ARM".
   - id: chk_arm_led_blink
     mode: restart
     then:
@@ -319,42 +430,24 @@ script:
             - switch.turn_on: tm1638_led_1
             - switch.turn_on: tm1638_led_3
             - switch.turn_on: tm1638_led_5
-            - switch.turn_on: tm1638_led_7
             - switch.turn_off: tm1638_led_2
             - switch.turn_off: tm1638_led_4
             - switch.turn_off: tm1638_led_6
-            - switch.turn_off: tm1638_led_8
             - delay: 400ms
             - switch.turn_off: tm1638_led_1
             - switch.turn_off: tm1638_led_3
             - switch.turn_off: tm1638_led_5
-            - switch.turn_off: tm1638_led_7
             - switch.turn_on: tm1638_led_2
             - switch.turn_on: tm1638_led_4
             - switch.turn_on: tm1638_led_6
-            - switch.turn_on: tm1638_led_8
             - delay: 400ms
-      - switch.turn_off: tm1638_led_1
-      - switch.turn_off: tm1638_led_2
-      - switch.turn_off: tm1638_led_3
-      - switch.turn_off: tm1638_led_4
-      - switch.turn_off: tm1638_led_5
-      - switch.turn_off: tm1638_led_6
-      - switch.turn_off: tm1638_led_7
-      - switch.turn_off: tm1638_led_8
+      - switch.turn_off: tm1638_leds_all
 
     # Reset all LEDs to off. Called from setup() after an unclean reset (crash/watchdog/brownout) to clear any stale LED state.
   - id: idle_led_reset
     mode: restart
     then:
-      - switch.turn_off: tm1638_led_1
-      - switch.turn_off: tm1638_led_2
-      - switch.turn_off: tm1638_led_3
-      - switch.turn_off: tm1638_led_4
-      - switch.turn_off: tm1638_led_5
-      - switch.turn_off: tm1638_led_6
-      - switch.turn_off: tm1638_led_7
-      - switch.turn_off: tm1638_led_8
+      - switch.turn_off: tm1638_leds_all
 
   # Replicates servo_to_mid.py: sweeps 2%→14% in 25 steps (~22s), stops at centre (7.5%).
   # Run one servo at a time. Observe full rotation range, note which is larger.
@@ -510,17 +603,41 @@ switch:
     entity_category: diagnostic
     icon: mdi:led-outline
     led: 7
+  # Group control — turns LEDs 1-6 on/off together. Used throughout the status LED
+  # scripts to replace the repeated 6-line turn_on/turn_off block; also a handy
+  # standalone diagnostic toggle for testing the LED bar. Deliberately excludes 7/8 —
+  # those are dedicated status dots (home/safety, API connectivity) and must never be
+  # touched by the shared scan/solve animations, only by their own dedicated logic.
+  - platform: template
+    name: "TM1638 LEDs 1-6"
+    id: tm1638_leds_all
+    entity_category: diagnostic
+    icon: mdi:led-outline
+    optimistic: true
+    turn_on_action:
+      - switch.turn_on: tm1638_led_1
+      - switch.turn_on: tm1638_led_2
+      - switch.turn_on: tm1638_led_3
+      - switch.turn_on: tm1638_led_4
+      - switch.turn_on: tm1638_led_5
+      - switch.turn_on: tm1638_led_6
+    turn_off_action:
+      - switch.turn_off: tm1638_led_1
+      - switch.turn_off: tm1638_led_2
+      - switch.turn_off: tm1638_led_3
+      - switch.turn_off: tm1638_led_4
+      - switch.turn_off: tm1638_led_5
+      - switch.turn_off: tm1638_led_6
 
 # ── TM1638 buttons ───────────────────────────────────────────────────────────
 binary_sensor:
   - platform: tm1638
     name: "TM1638 Button 1" # Start Scan
     id: tm1638_button_1
+    trigger_on_initial_state: true
     entity_category: diagnostic
     icon: mdi:cube-scan
     key: 0
-    filters:
-      - delayed_on: 10ms
     on_press:
       - script.execute: beep_click
       - script.execute:
@@ -530,14 +647,20 @@ binary_sensor:
           action: button.press
           data:
             entity_id: button.rubiks_cube_scanner_robot_start_scan
+          on_success:
+            - logger.log: "Start Scan action succeeded"
+          on_error:
+            - logger.log:
+                format: "Start Scan action failed: %s"
+                args: ["error.c_str()"]
+            - script.execute: beep_error
   - platform: tm1638
     name: "TM1638 Button 2" # Abort
     id: tm1638_button_2
+    trigger_on_initial_state: true
     entity_category: diagnostic
     icon: mdi:alert-octagon-outline
     key: 1
-    filters:
-      - delayed_on: 10ms
     on_press:
       - script.execute: beep_click
       - script.execute:
@@ -547,45 +670,56 @@ binary_sensor:
           action: button.press
           data:
             entity_id: button.rubiks_cube_scanner_robot_abort
+          on_success:
+            - logger.log: "Abort action succeeded"
+          on_error:
+            - logger.log:
+                format: "Abort action failed: %s"
+                args: ["error.c_str()"]
+            - script.execute: beep_error
   - platform: tm1638
-    name: "TM1638 Button 3" # Confirm Safe & Home
+    name: "TM1638 Button 3" # Scramble
     id: tm1638_button_3
+    trigger_on_initial_state: true
     entity_category: diagnostic
-    icon: mdi:home-import-outline
+    icon: mdi:dice-multiple-outline
     key: 2
-    filters:
-      - delayed_on: 10ms
     on_press:
       - script.execute: beep_click
       - script.execute:
           id: flash_led
           idx: 2
-      - lambda: "id(solver).confirm_safe_and_home();"
+      - homeassistant.action:
+          action: button.press
+          data:
+            entity_id: button.rubiks_cube_scanner_scramble
+          on_success:
+            - logger.log: "Scramble action succeeded"
+          on_error:
+            - logger.log:
+                format: "Scramble action failed: %s"
+                args: ["error.c_str()"]
+            - script.execute: beep_error
   - platform: tm1638
-    name: "TM1638 Button 4" # Scramble
+    name: "TM1638 Button 4" # Confirm Safe & Home
     id: tm1638_button_4
+    trigger_on_initial_state: true
     entity_category: diagnostic
-    icon: mdi:dice-multiple-outline
+    icon: mdi:home-import-outline
     key: 3
-    filters:
-      - delayed_on: 10ms
     on_press:
       - script.execute: beep_click
       - script.execute:
           id: flash_led
           idx: 3
-      - homeassistant.action:
-          action: button.press
-          data:
-            entity_id: button.rubiks_cube_scanner_scramble
+      - lambda: "id(solver).confirm_safe_and_home();"
   - platform: tm1638
     name: "TM1638 Button 5"
     id: tm1638_button_5
+    trigger_on_initial_state: true
     entity_category: diagnostic
     icon: mdi:gesture-tap-button
     key: 4
-    filters:
-      - delayed_on: 10ms
     on_press:
       - script.execute: beep_click
       - script.execute:
@@ -594,11 +728,10 @@ binary_sensor:
   - platform: tm1638
     name: "TM1638 Button 6"
     id: tm1638_button_6
+    trigger_on_initial_state: true
     entity_category: diagnostic
     icon: mdi:gesture-tap-button
     key: 5
-    filters:
-      - delayed_on: 10ms
     on_press:
       - script.execute: beep_click
       - script.execute:
@@ -607,11 +740,10 @@ binary_sensor:
   - platform: tm1638
     name: "TM1638 Button 7"
     id: tm1638_button_7
+    trigger_on_initial_state: true
     entity_category: diagnostic
     icon: mdi:gesture-tap-button
     key: 6
-    filters:
-      - delayed_on: 10ms
     on_press:
       - script.execute: beep_click
       - script.execute:
@@ -620,11 +752,10 @@ binary_sensor:
   - platform: tm1638
     name: "TM1638 Button 8"
     id: tm1638_button_8
+    trigger_on_initial_state: true
     entity_category: diagnostic
     icon: mdi:gesture-tap-button
     key: 7
-    filters:
-      - delayed_on: 10ms
     on_press:
       - script.execute: beep_click
       - script.execute:

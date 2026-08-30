@@ -46,10 +46,15 @@ class CalibrationStore:
                 _LOGGER.info(
                     "Loaded saved LAB anchors for %d colours: %s",
                     len(obj._saved),
-                    {c: tuple(round(x, 1) for x in lab) for c, lab in obj._saved.items()},
+                    {
+                        c: tuple(round(x, 1) for x in lab)
+                        for c, lab in obj._saved.items()
+                    },
                 )
             except Exception:  # noqa: BLE001
-                _LOGGER.warning("Saved LAB anchors could not be parsed — using factory defaults.")
+                _LOGGER.warning(
+                    "Saved LAB anchors could not be parsed — using factory defaults."
+                )
         else:
             _LOGGER.info("No saved LAB anchors — using factory defaults.")
         return obj

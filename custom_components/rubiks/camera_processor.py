@@ -20,23 +20,23 @@ REFERENCE_LAB: dict[str, tuple[float, float, float]] = {
     # Approximate OV2640 readings — a/b channels are compressed vs standard LAB.
     # R and O measured from this specific unit (two sessions, very consistent).
     # Other colours from a different unit — replace via Save Calibration after a clean scan.
-    "W": ( 66.0,  16.0, -15.0),
-    "Y": ( 74.0,  -1.0,  26.0),
-    "R": ( 35.0,  50.0,  22.0),  # measured: centres (33.5,49.7,23.4) (33.6,49.7,23.4)
-    "O": ( 62.0,  47.0,  27.0),  # measured: centres (61.9,47.9,27.7) (62.1,47.6,26.3)
-    "B": ( 32.0,  33.0, -51.0),
-    "G": ( 45.0, -15.0,  14.0),
+    "W": (66.0, 16.0, -15.0),
+    "Y": (74.0, -1.0, 26.0),
+    "R": (35.0, 50.0, 22.0),  # measured: centres (33.5,49.7,23.4) (33.6,49.7,23.4)
+    "O": (62.0, 47.0, 27.0),  # measured: centres (61.9,47.9,27.7) (62.1,47.6,26.3)
+    "B": (32.0, 33.0, -51.0),
+    "G": (45.0, -15.0, 14.0),
 }
 
 # RGB colours for the annotated image overlay labels
 OVERLAY_COLORS: dict[str, tuple[int, int, int]] = {
     "W": (200, 200, 200),
-    "Y": (220, 220,   0),
-    "R": (220,   0,   0),
-    "O": (220, 120,   0),
-    "B": (  0,  80, 220),
-    "G": (  0, 160,   0),
-    "?": (255,   0, 255),
+    "Y": (220, 220, 0),
+    "R": (220, 0, 0),
+    "O": (220, 120, 0),
+    "B": (0, 80, 220),
+    "G": (0, 160, 0),
+    "?": (255, 0, 255),
 }
 
 # Per-face image rotation applied before sticker detection (PIL convention: positive = CCW).
@@ -48,17 +48,17 @@ OVERLAY_COLORS: dict[str, tuple[int, int, int]] = {
 # known confusion pair on this sensor, see REFERENCE_LAB comment above) — settled by
 # mathematical derivation, see the SCAN_FACES comment in rubiks_solver.cpp.
 FACE_SCAN_ROTATIONS: dict[str, float] = {
-    "W":  180,
-    "B":    0,
-    "Y":  180,
-    "G":  180,
-    "O":   90,   # CCW (PIL positive) — brings White to image-top, Blue to image-left
-    "R":   90,   # CCW (PIL positive) — brings White to image-top, Green to image-left
+    "W": 180,
+    "B": 0,
+    "Y": 180,
+    "G": 180,
+    "O": 90,  # CCW (PIL positive) — brings White to image-top, Blue to image-left
+    "R": 90,  # CCW (PIL positive) — brings White to image-top, Green to image-left
 }
 
 CropBox = tuple[int, int, int, int]  # left, top, right, bottom
 
-_L_WEIGHT = 1.5   # L is a reliable discriminator on OV2640 — Red L≈14-38, Orange L≈40-63
+_L_WEIGHT = 1.5  # L is a reliable discriminator on OV2640 — Red L≈14-38, Orange L≈40-63
 _AB_WEIGHT = 2.0  # chrominance weighted more — hue separation is what matters
 _LAB_UNKNOWN_THRESHOLD = 80.0  # distance beyond which a sample is classified "?"
 
@@ -87,6 +87,7 @@ def _unrotate_point(
 
 def _srgb_to_lab(r: int, g: int, b: int) -> tuple[float, float, float]:
     """Convert sRGB (0-255) to CIELAB (D65 illuminant)."""
+
     def _lin(c: float) -> float:
         c /= 255.0
         return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
@@ -131,7 +132,7 @@ class FaceScan:
     """Result of scanning one cube face."""
 
     face_label: str
-    colors: list[str]                                       # 9 colour codes, row by row
+    colors: list[str]  # 9 colour codes, row by row
     lab_readings: list[tuple[float, float, float]] = field(default_factory=list)
     annotated_image: bytes = field(default_factory=bytes, repr=False)
 
@@ -178,10 +179,14 @@ def detect_face_colors(
 
     # Combine global crop rotation (CW-positive, so negate for PIL) with per-face
     # orientation correction (CCW-positive, PIL native). B needs no correction.
-    face_pil_angle = FACE_SCAN_ROTATIONS.get(override_centre, 0) if override_centre else 0
+    face_pil_angle = (
+        FACE_SCAN_ROTATIONS.get(override_centre, 0) if override_centre else 0
+    )
     total_pil_angle = face_pil_angle - rotation
     if total_pil_angle % 360:
-        face_image = face_image.rotate(total_pil_angle, expand=False, fillcolor=(0, 0, 0))
+        face_image = face_image.rotate(
+            total_pil_angle, expand=False, fillcolor=(0, 0, 0)
+        )
 
     rgb_image = face_image.convert("RGB")
     width, height = rgb_image.size
@@ -222,18 +227,25 @@ def detect_face_colors(
             per_cell_points.append(cell_samples)
             per_cell_labs.append(cell_lab_samples)
             # Median LAB across 5 sample points — stored for logging/display only; classification uses majority vote above.
-            lab_readings_raw.append((
-                statistics.median(pt[0] for pt in cell_lab_samples),
-                statistics.median(pt[1] for pt in cell_lab_samples),
-                statistics.median(pt[2] for pt in cell_lab_samples),
-            ))
+            lab_readings_raw.append(
+                (
+                    statistics.median(pt[0] for pt in cell_lab_samples),
+                    statistics.median(pt[1] for pt in cell_lab_samples),
+                    statistics.median(pt[2] for pt in cell_lab_samples),
+                )
+            )
 
     # Per-cell classification: classify each of 5 sample points, majority vote wins.
     colors: list[str] = []
     all_point_colors: list[list[str]] = []
 
     for cell_idx, ((row, col), _cell_samples, point_labs) in enumerate(
-        zip([(r, c) for r in range(3) for c in range(3)], per_cell_points, per_cell_labs, strict=True)
+        zip(
+            [(r, c) for r in range(3) for c in range(3)],
+            per_cell_points,
+            per_cell_labs,
+            strict=True,
+        )
     ):
         point_colors = [classify_lab(lab, refs) for lab in point_labs]
         all_point_colors.append(point_colors)
@@ -245,13 +257,20 @@ def detect_face_colors(
         L, a, b = lab_readings_raw[cell_idx]
         _LOGGER.info(
             "Cell [%d,%d] LAB(%.1f, %.1f, %.1f) point_votes=%s -> %s",
-            row, col, L, a, b, dict(counts), winner,
+            row,
+            col,
+            L,
+            a,
+            b,
+            dict(counts),
+            winner,
         )
 
     if override_centre and len(colors) == 9:
         _LOGGER.info(
             "Centre colour overridden: detected %s → declared %s",
-            colors[4], override_centre,
+            colors[4],
+            override_centre,
         )
         colors[4] = override_centre
 
@@ -267,9 +286,15 @@ def detect_face_colors(
     ]
 
     annotated = _annotate_image(
-        image, crop_box, box_offset, colors,
-        unrotated_points, all_point_colors,
-        cell_w, cell_h, lab_readings_raw,
+        image,
+        crop_box,
+        box_offset,
+        colors,
+        unrotated_points,
+        all_point_colors,
+        cell_w,
+        cell_h,
+        lab_readings_raw,
     )
 
     return FaceScan(
@@ -329,7 +354,9 @@ def _annotate_image(
     ):
         winning_rgb = OVERLAY_COLORS.get(color, (255, 0, 255))
 
-        for pt_idx, ((px, py), pt_color) in enumerate(zip(cell_samples, point_colors, strict=True)):
+        for pt_idx, ((px, py), pt_color) in enumerate(
+            zip(cell_samples, point_colors, strict=True)
+        ):
             ax = ox + px
             ay = oy + py
             pt_rgb = OVERLAY_COLORS.get(pt_color, (255, 0, 255))
@@ -348,10 +375,13 @@ def _annotate_image(
         # Semi-transparent background box behind all text for legibility
         pad = 2
         box_h = label_font_size + (debug_font_size + pad if lab_label else 0) + pad * 2
-        box_w = max(
-            draw.textlength(color, font=font),
-            draw.textlength(lab_label, font=font_small) if lab_label else 0,
-        ) + pad * 2
+        box_w = (
+            max(
+                draw.textlength(color, font=font),
+                draw.textlength(lab_label, font=font_small) if lab_label else 0,
+            )
+            + pad * 2
+        )
         draw.rectangle(
             [(tx - pad, ty - pad), (tx + box_w, ty + box_h)],
             fill=(0, 0, 0, 160),
@@ -362,7 +392,12 @@ def _annotate_image(
 
         # LAB values
         if lab_label:
-            draw.text((tx, ty + label_font_size + pad), lab_label, fill=(220, 220, 220), font=font_small)
+            draw.text(
+                (tx, ty + label_font_size + pad),
+                lab_label,
+                fill=(220, 220, 220),
+                font=font_small,
+            )
 
     buf = io.BytesIO()
     annotated.save(buf, format="JPEG", quality=85)
@@ -386,10 +421,10 @@ _LOW_CONF_THRESHOLD = 0.15
 class CalibrationResult:
     """Result of per-session colour calibration across all 6 faces."""
 
-    calibrated_faces: dict[str, list[str]]           # face_label -> 9 corrected colours
-    anchors: dict[str, tuple[float, float, float]]   # colour -> final LAB centroid
-    low_confidence: list[dict]                       # stickers where margin < threshold
-    pre_calibration_changes: list[dict]              # stickers changed vs raw first pass
+    calibrated_faces: dict[str, list[str]]  # face_label -> 9 corrected colours
+    anchors: dict[str, tuple[float, float, float]]  # colour -> final LAB centroid
+    low_confidence: list[dict]  # stickers where margin < threshold
+    pre_calibration_changes: list[dict]  # stickers changed vs raw first pass
     parity_valid: bool
     parity_error: str | None
 
@@ -459,14 +494,18 @@ def calibrate_faces(face_scans: dict[str, FaceScan]) -> CalibrationResult:
     assignment = _greedy_assign(anchors)
 
     # Recompute centroids from first assignment
-    clusters: dict[str, list[tuple[float, float, float]]] = {c: [] for c in colour_order}
+    clusters: dict[str, list[tuple[float, float, float]]] = {
+        c: [] for c in colour_order
+    }
     for si, colour in enumerate(assignment):
         if colour:
             clusters[colour].append(stickers[si][3])
     anchors = {
         colour: tuple(  # type: ignore[assignment]
             statistics.median(pt[i] for pt in labs) for i in range(3)
-        ) if (labs := clusters[colour]) else anchors[colour]
+        )
+        if (labs := clusters[colour])
+        else anchors[colour]
         for colour in colour_order
     }
 
@@ -489,19 +528,25 @@ def calibrate_faces(face_scans: dict[str, FaceScan]) -> CalibrationResult:
         calibrated_faces[face_label][cell_idx] = colour
         margin = round(margins[si], 3)
         if margin < _LOW_CONF_THRESHOLD:
-            low_confidence.append({
-                "face": face_label,
-                "cell": cell_idx,
-                "assigned": colour,
-                "raw": raw_color,
-                "margin": margin,
-                "runner_up": all_sorted_dists[si][1][1],
-            })
+            low_confidence.append(
+                {
+                    "face": face_label,
+                    "cell": cell_idx,
+                    "assigned": colour,
+                    "raw": raw_color,
+                    "margin": margin,
+                    "runner_up": all_sorted_dists[si][1][1],
+                }
+            )
         if colour != raw_color:
-            pre_calibration_changes.append({
-                "face": face_label, "cell": cell_idx,
-                "from": raw_color, "to": colour,
-            })
+            pre_calibration_changes.append(
+                {
+                    "face": face_label,
+                    "cell": cell_idx,
+                    "from": raw_color,
+                    "to": colour,
+                }
+            )
 
     parity_valid, parity_error = check_cube_parity(calibrated_faces)
 
@@ -535,7 +580,10 @@ _SUMMARY_NET_POSITIONS: dict[str, tuple[int, int]] = {
     # W/Y align with G's column (not centred across the row) — matching the physical
     # net, since W's bottom edge touches G's top edge when folded.
     "W": (1, 0),
-    "O": (0, 1), "G": (1, 1), "R": (2, 1), "B": (3, 1),
+    "O": (0, 1),
+    "G": (1, 1),
+    "R": (2, 1),
+    "B": (3, 1),
     "Y": (1, 2),
 }
 
@@ -581,7 +629,7 @@ def generate_summary_image(face_images: dict[str, bytes]) -> bytes:
             # to the 0°/180° ones (expand=True would swap width/height for a 90°
             # rotation, stretching it when forced back into a fixed landscape box).
             thumb = thumb.rotate(angle, expand=False, fillcolor=(30, 30, 30))
-        thumb = thumb.resize((thumb_w, thumb_h), Image.LANCZOS)
+        thumb = thumb.resize((thumb_w, thumb_h), Image.Resampling.LANCZOS)
 
         label_rgb = OVERLAY_COLORS.get(face_label, (200, 200, 200))
         draw.rectangle([(x, y), (x + thumb_w, y + label_h - 1)], fill=(20, 20, 20))
@@ -607,8 +655,12 @@ def check_running_validity(scanned_faces: dict[str, list[str]]) -> list[str]:
     counts = Counter(all_colours)
 
     colour_names = {
-        "W": "White", "Y": "Yellow", "R": "Red",
-        "O": "Orange", "B": "Blue", "G": "Green",
+        "W": "White",
+        "Y": "Yellow",
+        "R": "Red",
+        "O": "Orange",
+        "B": "Blue",
+        "G": "Green",
     }
 
     for colour, count in counts.items():
@@ -635,7 +687,9 @@ def check_running_validity(scanned_faces: dict[str, list[str]]) -> list[str]:
     return warnings
 
 
-def check_cube_parity(calibrated_faces: dict[str, list[str]]) -> tuple[bool, str | None]:
+def check_cube_parity(
+    calibrated_faces: dict[str, list[str]],
+) -> tuple[bool, str | None]:
     """Validate colour counts across all 6 faces.
 
     Full permutation parity check is deferred until face-adjacency is known

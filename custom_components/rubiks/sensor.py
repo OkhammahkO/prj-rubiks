@@ -55,14 +55,18 @@ def _cube_net(scanned: dict[str, list[str]]) -> str:
         ]
 
     w, o, g, r, y, b = (
-        face_rows("W"), face_rows("O"), face_rows("G"),
-        face_rows("R"), face_rows("Y"), face_rows("B"),
+        face_rows("W"),
+        face_rows("O"),
+        face_rows("G"),
+        face_rows("R"),
+        face_rows("Y"),
+        face_rows("B"),
     )
 
     s = "⬛"
-    sep_row = s * 15                          # full-width separator row
-    pre = f"{s}{s}{s}{s}"                     # 4 ⬛ before top/bottom face
-    suf = f"{s}{s}{s}{s}{s}{s}{s}{s}"        # 8 ⬛ after  top/bottom face
+    sep_row = s * 15  # full-width separator row
+    pre = f"{s}{s}{s}{s}"  # 4 ⬛ before top/bottom face
+    suf = f"{s}{s}{s}{s}{s}{s}{s}{s}"  # 8 ⬛ after  top/bottom face
 
     lines = [
         f"{pre}{w[0]}{suf}",
@@ -79,6 +83,7 @@ def _cube_net(scanned: dict[str, list[str]]) -> str:
     ]
     return "\n" + "\n".join(lines)
 
+
 CUBE_STATE_SENSOR = SensorEntityDescription(
     key="cube_state", translation_key="cube_state", icon="mdi:cube-outline"
 )
@@ -89,7 +94,9 @@ FACES_SCANNED_SENSOR = SensorEntityDescription(
     key="faces_scanned", translation_key="faces_scanned", icon="mdi:counter"
 )
 SCAN_WARNINGS_SENSOR = SensorEntityDescription(
-    key="scan_warnings", translation_key="scan_warnings", icon="mdi:alert-circle-outline"
+    key="scan_warnings",
+    translation_key="scan_warnings",
+    icon="mdi:alert-circle-outline",
 )
 KOCIEMBA_INPUT_SENSOR = SensorEntityDescription(
     key="kociemba_input", translation_key="kociemba_input", icon="mdi:code-brackets"
@@ -105,14 +112,16 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Rubiks sensor entities."""
-    async_add_entities([
-        CubeStateSensor(hass, entry),
-        CurrentFaceSensor(hass, entry),
-        FacesScannedSensor(hass, entry),
-        ScanWarningSensor(hass, entry),
-        KociembaInputSensor(hass, entry),
-        SolutionSensor(hass, entry),
-    ])
+    async_add_entities(
+        [
+            CubeStateSensor(hass, entry),
+            CurrentFaceSensor(hass, entry),
+            FacesScannedSensor(hass, entry),
+            ScanWarningSensor(hass, entry),
+            KociembaInputSensor(hass, entry),
+            SolutionSensor(hass, entry),
+        ]
+    )
 
 
 class RubiksSensorBase(SensorEntity):
@@ -183,10 +192,14 @@ class CubeStateSensor(RubiksSensorBase):
         """Subscribe to scan, calibration, and cal-store events."""
         await super().async_added_to_hass()
         self.async_on_remove(
-            self.hass.bus.async_listen(f"{DOMAIN}_calibration_saved", self._on_cal_store_changed)
+            self.hass.bus.async_listen(
+                f"{DOMAIN}_calibration_saved", self._on_cal_store_changed
+            )
         )
         self.async_on_remove(
-            self.hass.bus.async_listen(f"{DOMAIN}_calibration_reset", self._on_cal_store_changed)
+            self.hass.bus.async_listen(
+                f"{DOMAIN}_calibration_reset", self._on_cal_store_changed
+            )
         )
 
     def _base_attrs(self) -> dict[str, Any]:
@@ -197,7 +210,11 @@ class CubeStateSensor(RubiksSensorBase):
         }
 
     def _cal_source(self) -> str:
-        cal_store = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id, {}).get("cal_store")
+        cal_store = (
+            self.hass.data.get(DOMAIN, {})
+            .get(self._entry.entry_id, {})
+            .get("cal_store")
+        )
         if cal_store and cal_store.has_saved:
             return "saved (adapted to your camera)"
         return "factory defaults"
@@ -209,7 +226,8 @@ class CubeStateSensor(RubiksSensorBase):
         n = len(scanned)
         self._attr_native_value = (
             "".join("".join(scanned[c]) for c in SCAN_SEQUENCE if c in scanned)
-            if n == 6 else None
+            if n == 6
+            else None
         )
         warnings = event.data.get("warnings") or []
         self._attr_extra_state_attributes = {
@@ -223,7 +241,10 @@ class CubeStateSensor(RubiksSensorBase):
     @callback
     def _on_reset(self, event: Event) -> None:
         self._attr_native_value = None
-        self._attr_extra_state_attributes = {**self._base_attrs(), "scan warnings": "none"}
+        self._attr_extra_state_attributes = {
+            **self._base_attrs(),
+            "scan warnings": "none",
+        }
         self.async_write_ha_state()
 
     @callback
@@ -309,7 +330,8 @@ class CurrentFaceSensor(RubiksSensorBase):
                 "motion": SCAN_MOTION[next_face],
                 "remaining": " → ".join(
                     CUBE_COLORS[c].capitalize()
-                    for c in SCAN_SEQUENCE if c not in scanned
+                    for c in SCAN_SEQUENCE
+                    if c not in scanned
                 ),
             }
             if next_face == "W":
@@ -380,8 +402,11 @@ class FacesScannedSensor(RubiksSensorBase):
     def _on_image_update(self, event: Event) -> None:
         """Update image size attributes after a preview."""
         self._attr_extra_state_attributes = {
-            **{k: v for k, v in self._attr_extra_state_attributes.items()
-               if k not in ("image_width", "image_height")},
+            **{
+                k: v
+                for k, v in self._attr_extra_state_attributes.items()
+                if k not in ("image_width", "image_height")
+            },
             **self._image_context(),
         }
         self.async_write_ha_state()
@@ -427,7 +452,9 @@ class ScanWarningSensor(RubiksSensorBase):
     def _apply_warnings(self, warnings: list[str]) -> None:
         self._attr_native_value = len(warnings)
         self._attr_extra_state_attributes = {
-            "status": "🟢 All clear" if not warnings else f"🔴 {len(warnings)} warning{'s' if len(warnings) != 1 else ''}",
+            "status": "🟢 All clear"
+            if not warnings
+            else f"🔴 {len(warnings)} warning{'s' if len(warnings) != 1 else ''}",
             "warnings": warnings if warnings else [],
         }
         self.async_write_ha_state()
