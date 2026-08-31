@@ -466,7 +466,12 @@ void RubiksSolverComponent::plan_ensure_cover_closed_() {
                          : t_open_close_time_;
   // Cross-servo timing guard lives in append_step_() now — see its comment.
   append_step_(ServoStep::TOP, t_close_v_, cover_dur);
-  append_step_(ServoStep::TOP, t_rel_v_,   t_open_close_time_);
+  // Release is a no-op while Top: Release Offset is disabled (0) — t_rel_v_ then
+  // equals t_close_v_ exactly, so this step would otherwise cost a full
+  // t_open_close_time_ of dead time for zero motion. Skip it until the offset
+  // feature is actually finished; behavior is unchanged for a nonzero offset.
+  if (d_t_rel_offset_ != 0)
+    append_step_(ServoStep::TOP, t_rel_v_, t_open_close_time_);
   plan_top_cover_ = TopCover::CLOSED;
 }
 
@@ -500,9 +505,10 @@ void RubiksSolverComponent::plan_flip_(int count, char next_token) {
   // After last flip: transition cover based on what comes next
   if (next_token == 'R') {
     // Rotate follows — close cover to constrain top 2 layers.
-    // Release fires t_flip_to_close_time_ after close so the arm has time to reach close position.
     append_step_(ServoStep::TOP, t_close_v_, t_flip_to_close_time_);
-    append_step_(ServoStep::TOP, t_rel_v_,   t_flip_to_close_time_);
+    // Same no-op skip as plan_ensure_cover_closed_() — see comment there.
+    if (d_t_rel_offset_ != 0)
+      append_step_(ServoStep::TOP, t_rel_v_, t_flip_to_close_time_);
     plan_top_cover_ = TopCover::CLOSED;
   } else {
     // Spin or end — open cover so cube can rotate freely

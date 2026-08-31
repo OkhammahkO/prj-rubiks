@@ -2,7 +2,7 @@ esphome:
   name: rubiks-solver
   project:
     name: "okhammahko.rubiks_solver"
-    version: "0.4.12"
+    version: "0.4.13"
   on_boot:
     then:
       - script.execute: show_boot_text
@@ -49,6 +49,9 @@ ota:
 
 logger:
   baud_rate: 0 # disables UART logger output → no more serial noise on GPIO43
+  level: VERBOSE # TEMP: surfaces the per-step dispatch log (rubiks_solver.cpp ~line 217)
+  # for diagnosing the open/close→turn timing gap — revert to default (remove this
+  # line) once done, it's noisy for normal use.
 
 debug:
 
