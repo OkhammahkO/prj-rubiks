@@ -24,7 +24,7 @@ User beware, most of the porting of this project and additional development and 
 ## Setup
 
  - Don't expect magic out of the box — like the original, servo and colour calibration take some patience to dial in.
-  - Assembly generally follows the original — I haven't documented my own variations here. I've been pretty sparse with details of my build and the set-up. But happy to develop detail if there's interest.
+  - Assembly generally follows the original — I haven't documented my own variations here. I've been pretty sparse with details of my build and the set-up (except for AI generated docs). But happy to develop detail if there's interest.
 
 
 1. Install the software — HACS component + flash `rubiks-solver.yaml`.
