@@ -2,7 +2,7 @@ esphome:
   name: rubiks-solver
   project:
     name: "okhammahko.rubiks_solver"
-    version: "0.4.13"
+    version: "0.4.14"
   on_boot:
     then:
       - script.execute: show_boot_text
@@ -830,6 +830,17 @@ button:
     entity_category: diagnostic
     on_press:
       lambda: 'id(solver_status_text).publish_state("HELLO");'
+
+  # Re-runs dump_config() on demand — normally ESPHome only calls this once at boot.
+  # Logs every raw duty setting, computed servo position, and timing value in one shot
+  # (rubiks_solver.cpp dump_config()) so current live values can be pasted elsewhere
+  # without digging through the dashboard entity-by-entity.
+  - platform: template
+    name: "Report: Servo Parameters"
+    icon: "mdi:clipboard-text-outline"
+    entity_category: diagnostic
+    on_press:
+      lambda: "id(solver).dump_config();"
 
   # ── Sweep test buttons (replicates servo_to_mid.py) ─────────────────────────
   # Sweeps 2%→14% duty over ~22s then stops at centre (7.5% = 1.5ms).

@@ -478,8 +478,11 @@ void RubiksSolverComponent::plan_ensure_cover_closed_() {
 // ── Primitive planners ────────────────────────────────────────────────────────
 
 // Flip cube n times (front face → bottom).
-// next_token: the move character immediately after this F block ('R', 'S', or 0).
-// Used to decide whether to leave the cover closed (→ R) or open (→ S / end).
+// next_token: the move character immediately after this F block ('R', 'S', 0, or the
+// scan-only sentinel 'X' — see plan_scan_move_()). Used to decide whether to leave the
+// cover closed (→ R), open (→ S / end), or untouched at FLIP (→ X, caller closes it).
+// 'X' never appears in a real kociemba move string (only F/S/R), so plan_solution_()'s
+// calls are unaffected.
 void RubiksSolverComponent::plan_flip_(int count, char next_token) {
   for (int i = 0; i < count; i++) {
     // flip_up(): raise arm to flip position
@@ -510,6 +513,12 @@ void RubiksSolverComponent::plan_flip_(int count, char next_token) {
     if (d_t_rel_offset_ != 0)
       append_step_(ServoStep::TOP, t_rel_v_, t_flip_to_close_time_);
     plan_top_cover_ = TopCover::CLOSED;
+  } else if (next_token == 'X') {
+    // Scan caller — leave the arm at FLIP. plan_ensure_cover_closed_() runs next (in
+    // plan_scan_move_()'s caller) and already picks t_flip_to_close_time_ for a direct
+    // FLIP→CLOSE leg when it sees plan_top_cover_ == FLIP, so opening here first would
+    // just be a wasted extra reversal (this was the "flip cuts short, goes back down"
+    // bug during scanning — the auto-open below fired, then the caller closed again).
   } else {
     // Spin or end — open cover so cube can rotate freely
     append_step_(ServoStep::TOP, t_open_v_, t_flip_open_time_);
@@ -629,15 +638,15 @@ void RubiksSolverComponent::plan_scan_move_(int face_idx) {
   // plan_top_cover_ carries CLOSED from previous face; caller adds ensure_closed after.
   switch (face_idx) {
     case 0: break;                          // White — already on top, no movement
-    case 1: plan_flip_(1, 0); break;        // Blue  — 1 flip (back → top)
-    case 2: plan_flip_(1, 0); break;        // Yellow — 1 flip (bottom → top)
-    case 3: plan_flip_(1, 0); break;        // Green  — 1 flip (front → top)
+    case 1: plan_flip_(1, 'X'); break;      // Blue  — 1 flip (back → top)
+    case 2: plan_flip_(1, 'X'); break;      // Yellow — 1 flip (bottom → top)
+    case 3: plan_flip_(1, 'X'); break;      // Green  — 1 flip (front → top)
     case 4:                                 // Red    — cover is CLOSED from prev; open first, then spin CW + flip
       plan_ensure_cover_open_();
       plan_spin_(1);
-      plan_flip_(1, 0);
+      plan_flip_(1, 'X');
       break;
-    case 5: plan_flip_(2, 0); break;        // Orange — 2 flips
+    case 5: plan_flip_(2, 'X'); break;      // Orange — 2 flips
   }
 }
 
