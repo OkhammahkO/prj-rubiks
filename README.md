@@ -1,7 +1,7 @@
 # Rubee - Scans and solves a rubiks cube.
 A Home Assistant + ESPHome remake of [CUBOTino](https://www.instructables.com/CUBOTino-Autonomous-Small-3D-Printed-Rubiks-Cube-R/)
 
-<img src="docs/Images/Esp_cam/Rubee.jpeg" width="400" alt="Rubee, the robot">
+<img src="docs/Images/Esp_cam/rubee-demo.gif" width="400" alt="Rubee, the robot, demo">
 
 Main differences in this build:
 - A HACS component and ESPHome talk to each other and split the work of cube scanning and solving.
