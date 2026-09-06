@@ -1,6 +1,8 @@
 # Rubee - Scans and solves a rubiks cube.
 A Home Assistant + ESPHome remake of [CUBOTino](https://www.instructables.com/CUBOTino-Autonomous-Small-3D-Printed-Rubiks-Cube-R/)
 
+💬 [Discuss on the Home Assistant Community forum](https://community.home-assistant.io/t/rubee-scans-and-solves-a-rubiks-cube/1024172?u=mahko_mahko)
+
 <img src="docs/Images/Esp_cam/rubee-demo.gif" width="400" alt="Rubee, the robot, demo">
 
 Main differences in this build:
