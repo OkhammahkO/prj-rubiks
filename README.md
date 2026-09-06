@@ -51,11 +51,11 @@ TODO:
 
 ## Extras
 
-- Need a cube? [MoYu RS3M V5 3x3](https://www.aliexpress.com/item/1005006116653775.html) — cheap, decent, magnetic.
+- Need a cube? [MoYu RS3M V5 3x3](https://www.aliexpress.com/item/1005006116653775.html)  - cheap, decent, magnetic. Learning on a magnetic cube is way better and should make it easier for the robit too.
 - Want to learn to solve one by hand? [This playlist](https://www.youtube.com/playlist?list=PLUprj8UXelXGXLTvO5RaJ92_yJxOwd957) is fun if you've got a little patience.
 
 ---
 
-## License
+## License / Credits
 
-[MIT](LICENSE) for this project's software. The physical CUBOTino design/mechanism is Andrea Favero's — see [his Instructables page](https://www.instructables.com/CUBOTino-Autonomous-Small-3D-Printed-Rubiks-Cube-R/) for terms on the design itself. Googly eyes from [Andreas Spiess's build](https://youtu.be/G5Ii6ENUXEs).
+[MIT](LICENSE) for this project's software. The physical CUBOTino design/mechanism is Andrea Favero's - see [his Instructables page](https://www.instructables.com/CUBOTino-Autonomous-Small-3D-Printed-Rubiks-Cube-R/) for terms on the design itself. Googly eyes as per  [Andreas Spiess's build](https://youtu.be/G5Ii6ENUXEs).
