@@ -1006,7 +1006,7 @@ number:
     optimistic: true
     restore_value: true
     mode: box
-    initial_value: 400
+    initial_value: 450
     min_value: 100
     max_value: 2000
     step: 50
@@ -1021,7 +1021,7 @@ number:
     optimistic: true
     restore_value: true
     mode: box
-    initial_value: 400
+    initial_value: 550
     min_value: 100
     max_value: 3000
     step: 50
@@ -1051,7 +1051,7 @@ number:
     optimistic: true
     restore_value: true
     mode: box
-    initial_value: 300
+    initial_value: 100
     min_value: 50
     max_value: 2000
     step: 50
@@ -1081,7 +1081,7 @@ number:
     optimistic: true
     restore_value: true
     mode: box
-    initial_value: 77
+    initial_value: 76
     min_value: 30
     max_value: 150
     step: 1
@@ -1113,7 +1113,7 @@ number:
     optimistic: true
     restore_value: true
     mode: box
-    initial_value: 4
+    initial_value: 8
     min_value: 0
     max_value: 15
     step: 1
@@ -1129,7 +1129,7 @@ number:
     optimistic: true
     restore_value: true
     mode: box
-    initial_value: 2
+    initial_value: 4
     min_value: 0
     max_value: 15
     step: 1
@@ -1146,7 +1146,7 @@ number:
     optimistic: true
     restore_value: true
     mode: box
-    initial_value: 700
+    initial_value: 550
     min_value: 20
     max_value: 1500
     step: 10
@@ -1162,7 +1162,7 @@ number:
     optimistic: true
     restore_value: true
     mode: box
-    initial_value: 700
+    initial_value: 400
     min_value: 100
     max_value: 3000
     step: 50
@@ -1177,7 +1177,7 @@ number:
     optimistic: true
     restore_value: true
     mode: box
-    initial_value: 700
+    initial_value: 500
     min_value: 100
     max_value: 3000
     step: 50

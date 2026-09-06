@@ -165,6 +165,12 @@ first. Once tuning settles down, this can be trimmed back to just the current va
 note above; until then it's cheaper to log a change here than to lose track of why a
 number is what it is.
 
+- **2026-09-06** — YAML `initial_value`s synced to live dashboard state after the
+  speed-up pass below: `Top: Flip-Close` 400→450, `Top: Close-Flip` 400→550,
+  `Top: Open-Close` 300→**100** (matches Andrea's own AF-tuned value exactly),
+  `Bottom: Home Pos` 77→76, `Bottom: Extra Sides` 4→8, `Bottom: Extra Home` 2→4,
+  `Bottom: Release` 700→550, `Bottom: Spin` 700→400, `Bottom: Rotate` 700→500. Compiled
+  clean; a fresh flash now boots straight into the currently-confirmed values.
 - **2026-09-06** — `Top: Close-Flip` 400→**500ms**, `Top: Flip-Open` 300→**400ms**.
   Fixed scan flips cutting short (see "Confirmed findings" — the redundant-open-step
   bug had masked whether duration was ever the real problem; once that was fixed, a
