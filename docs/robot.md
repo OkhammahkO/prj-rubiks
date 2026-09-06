@@ -261,7 +261,7 @@ esphome/
 
 **Kociemba runs in HA, not the ESP32** — the two-phase pruning tables need 10-20MB RAM;
 the ESP32-S3 has 8MB PSRAM. HA already assembles the cube state string, so
-`kociemba.solve()` is one more line in `solver.py`. The ESP32 only needs to faithfully
+`solver.solve()` is one more line in `solver.py`. The ESP32 only needs to faithfully
 execute the solution string — it never needs to understand the cube.
 
 **Why a C++ component, not YAML lambdas**: the servo logic

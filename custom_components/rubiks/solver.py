@@ -3,9 +3,37 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections import Counter
+from pathlib import Path
+
+# Matches twophase.solver's trailing move-count annotation, e.g. "U1 R3 (2f)" or "(0f)" —
+# not part of the move sequence itself, stripped before use.
+_TWOPHASE_SUFFIX_RE = re.compile(r"\s*\(\d+f\)$")
+
+# Pruning tables ship compressed (~32MB vs ~70MB raw) since generating them from scratch
+# in pure Python takes 30+ minutes; decompression takes well under a second. Extracted
+# once per install (or per fresh HA restart if wiped) into a sibling directory.
+_TABLES_ARCHIVE = Path(__file__).parent / "twophase_tables.tar.gz"
+_TABLES_DIR = Path(__file__).parent / "twophase_tables"
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _ensure_tables_extracted() -> None:
+    """Decompress the bundled twophase pruning tables on first use.
+
+    Plain file decompression via the standard library — no compiler, no C extension,
+    nothing that could hit the sandboxed-build issues that ruled out `kociemba` on
+    Home Assistant OS.
+    """
+    if _TABLES_DIR.exists():
+        return
+    import tarfile  # noqa: PLC0415
+
+    _LOGGER.info("Extracting twophase pruning tables (first run after install/update)")
+    with tarfile.open(_TABLES_ARCHIVE, "r:gz") as tar:
+        tar.extractall(_TABLES_DIR, filter="data")
 
 # Maps each cube colour code to its kociemba face label
 COLOUR_TO_FACE: dict[str, str] = {
@@ -326,25 +354,47 @@ def _is_solved(cube_string: str) -> bool:
 
 
 def solve(cube_string: str) -> str | None:
-    """Run the kociemba two-phase solver and return the move sequence string.
+    """Run the two-phase solver and return the move sequence string.
 
     Runs synchronously — call via async_add_executor_job.
     Returns None on failure (import error or invalid cube state).
+
+    Uses `twophase` (pure Python, GPLv3+ — see LICENSE) rather than the `kociemba`
+    package: `kociemba` ships no Linux wheels and its C-extension build fails on
+    HAOS's sandboxed, musl-based install environment. `twophase` needs no compiled
+    extension at all, at the cost of needing its pruning tables pre-built and shipped
+    with this integration (compressed, `twophase_tables.tar.gz`, extracted on first
+    use — see `_ensure_tables_extracted()`) rather than generated on first use, which
+    would otherwise take 30+ minutes in pure Python.
     """
-    # kociemba has a bug where it returns non-trivial moves for an already-solved cube.
     if _is_solved(cube_string):
         return ""
     try:
-        import kociemba  # noqa: PLC0415
+        _ensure_tables_extracted()
+
+        # twophase.defs.FOLDER (default: relative "twophase") must be redirected to our
+        # bundled, pre-built tables *before* twophase.solver is ever imported — importing
+        # it pulls in twophase.coord, which generates/loads pruning tables as a module-level
+        # side effect on first import. Only takes effect the first time in this process
+        # (later imports are cached), which is exactly what we want — one table load per
+        # HA restart, not per solve.
+        import twophase.defs as twophase_defs  # noqa: PLC0415
+
+        twophase_defs.FOLDER = str(_TABLES_DIR)
+        import twophase.solver as twophase_solver  # noqa: PLC0415
     except ImportError:
         _LOGGER.error(
-            "kociemba library not installed — add it to manifest requirements"
+            "twophase library not installed — add it to manifest requirements"
         )
         return None
     try:
-        return kociemba.solve(cube_string)
+        result = twophase_solver.solve(cube_string)
     except Exception as err:  # noqa: BLE001
-        _LOGGER.error("kociemba solver failed: %s | cube string: %s", err, cube_string)
+        _LOGGER.error("twophase solver failed: %s | cube string: %s", err, cube_string)
+        return None
+
+    if result.startswith("Error"):
+        _LOGGER.error("twophase solver rejected cube string: %s", result)
         issues = diagnose_cube_string(cube_string)
         if issues:
             _LOGGER.error(
@@ -358,3 +408,8 @@ def solve(cube_string: str) -> str | None:
                 "Cube state passes structural checks — likely an orientation parity violation"
             )
         return None
+
+    # Strip twophase's trailing "(Nf)" move-count annotation — not part of the move
+    # sequence. Digit-suffixed notation ("U1 R3 F2"), which robot_required_moves() on
+    # the ESP32 side already accepts alongside bare kociemba notation.
+    return _TWOPHASE_SUFFIX_RE.sub("", result).strip()

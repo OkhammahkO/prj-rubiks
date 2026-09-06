@@ -484,7 +484,7 @@ class ScanWarningSensor(RubiksSensorBase):
 
 
 class KociembaInputSensor(RubiksSensorBase):
-    """54-character kociemba input string — the exact value passed to kociemba.solve()."""
+    """54-character kociemba-notation input string — the exact value passed to solver.solve()."""
 
     entity_description = KOCIEMBA_INPUT_SENSOR
     _attr_native_value: str | None = None

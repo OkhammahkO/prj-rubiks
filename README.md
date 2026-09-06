@@ -55,4 +55,4 @@ User beware, most of the porting of this project and additional development and 
 
 ## License / Credits
 
-[MIT](LICENSE) for this project's software. The physical CUBOTino design/mechanism is Andrea Favero's - see [his Instructables page](https://www.instructables.com/CUBOTino-Autonomous-Small-3D-Printed-Rubiks-Cube-R/) for terms on the design itself. Googly eyes as per  [Andreas Spiess's build](https://youtu.be/G5Ii6ENUXEs).
+[MIT](LICENSE) for this project's software, except `custom_components/rubiks` which is [GPLv3+](custom_components/rubiks/LICENSE) — it depends on `twophase` for cube solving, since `kociemba` doesn't install reliably on Home Assistant OS. The physical CUBOTino design/mechanism is Andrea Favero's - see [his Instructables page](https://www.instructables.com/CUBOTino-Autonomous-Small-3D-Printed-Rubiks-Cube-R/) for terms on the design itself. Googly eyes as per  [Andreas Spiess's build](https://youtu.be/G5Ii6ENUXEs).

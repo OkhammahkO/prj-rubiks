@@ -52,10 +52,23 @@ Take the cube state string and produce a move sequence.
 `solver.py`: camera grid index → kociemba face-position index remap per scan position
 (`CAMERA_TO_KOCIEMBA_REMAP` for Phase 1/2, `ROBOT_CAMERA_TO_KOCIEMBA_REMAP` for the robot
 — see `docs/orientation.md`); populates `kociemba_faces` after calibration.
-`kociemba>=1.0` wraps `kociemba.solve()` via `async_add_executor_job`, with a
-`_is_solved()` short-circuit (the library returns a non-trivial sequence for an
-already-solved input otherwise). Kociemba Input and Solution sensors expose the string
-and move sequence. Verified against a physical cube end-to-end.
+`solver.solve()` wraps `twophase.solver.solve()` via `async_add_executor_job` (not
+the `kociemba` package — see "Solver dependency" below), with a `_is_solved()`
+short-circuit before calling it either way. Kociemba Input and Solution sensors expose
+the string and move sequence. Verified against a physical cube end-to-end.
+
+**Solver dependency**: uses `twophase` (pure Python, GPLv3+ — see
+`custom_components/rubiks/LICENSE`), not `kociemba`. `kociemba` ships no Linux wheels
+and its C-extension build fails on Home Assistant OS's sandboxed, musl-based install
+environment; `twophase` needs no compiled extension at all, at the cost of needing its
+pruning tables pre-built rather than generated on first use (30+ minutes in pure
+Python). Shipped compressed as `custom_components/rubiks/twophase_tables.tar.gz`
+(~33MB vs ~70MB raw) and extracted to a sibling `twophase_tables/` directory
+(gitignored — a local runtime artifact, not tracked) the first time `solve()` runs
+after install/update — plain stdlib `tarfile` decompression, no compiler involved, so
+none of the HAOS build issues that ruled out `kociemba` apply. `twophase.defs.FOLDER`
+is redirected to that extracted path before first import — see `solver.solve()`'s and
+`_ensure_tables_extracted()`'s docstrings.
 
 **Open**: cube net display verification.
 
@@ -215,6 +228,6 @@ for whoever else works on this later — not blocking anything currently.
 |-------|-------|
 | Red/Orange separation | Hardest colour pair on this camera (see `docs/spec.md` "Red/Orange Separation" for the actual L ranges) — loading-position enforcement assigns labels by scan position, not centre classification, eliminating the ambiguity; LAB warning still fires if a scan looks wrong |
 | White centre has brand logo | 5-point majority vote handles it but confidence may be low |
-| Full permutation parity not checked | `kociemba.solve()` rejects unsolvable states implicitly |
+| Full permutation parity not checked | The solver rejects unsolvable states implicitly (returns an error rather than a bogus solution) |
 | LED never auto-turns-off | User controls it via normal HA UI |
 | No real servo position feedback | Neither this project nor the original CUBOTino has any — see `docs/collision-prevention.md` |

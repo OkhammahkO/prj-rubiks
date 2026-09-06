@@ -2,12 +2,35 @@
 
 from __future__ import annotations
 
+import sys
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
 from custom_components.rubiks.solver import (
     CAMERA_TO_KOCIEMBA_REMAP,
     COLOUR_TO_FACE,
     build_kociemba_faces,
     diagnose_cube_string,
     kociemba_string,
+    solve,
+)
+
+_SOLVED_CUBE = "U" * 9 + "R" * 9 + "F" * 9 + "D" * 9 + "L" * 9 + "B" * 9
+# Not a physically valid cube, just non-uniform per face — enough to skip _is_solved()'s
+# short-circuit so the (mocked) solver call underneath actually gets exercised.
+_SCRAMBLED_CUBE = (
+    "U" * 8
+    + "R"
+    + "R" * 8
+    + "F"
+    + "F" * 8
+    + "D"
+    + "D" * 8
+    + "L"
+    + "L" * 8
+    + "B"
+    + "B" * 8
+    + "U"
 )
 
 
@@ -173,3 +196,41 @@ class TestDiagnoseCubeString:
         issues = diagnose_cube_string(cube_str)
         # Should have issues about count mismatch
         assert len(issues) > 0
+
+
+class TestSolve:
+    """Test solve() — the twophase-backed solver wrapper."""
+
+    def test_already_solved_short_circuits(self) -> None:
+        """An already-solved cube returns '' without ever touching twophase."""
+        # No mocking needed — _is_solved() returns before the deferred import runs,
+        # so this passes even in an environment without twophase installed.
+        assert solve(_SOLVED_CUBE) == ""
+
+    def test_strips_move_count_suffix(self) -> None:
+        """twophase's trailing '(Nf)' annotation is stripped from a successful solve."""
+        fake_solver = MagicMock()
+        fake_solver.solve.return_value = "U1 R3 F2 (3f)"
+        with patch.dict(
+            sys.modules,
+            {
+                "twophase.defs": SimpleNamespace(FOLDER=""),
+                "twophase.solver": fake_solver,
+            },
+        ):
+            result = solve(_SCRAMBLED_CUBE)
+        assert result == "U1 R3 F2"
+
+    def test_error_string_returns_none(self) -> None:
+        """A twophase error string (not an exception) is treated as a failure."""
+        fake_solver = MagicMock()
+        fake_solver.solve.return_value = "Error: Wrong edge and corner parity"
+        with patch.dict(
+            sys.modules,
+            {
+                "twophase.defs": SimpleNamespace(FOLDER=""),
+                "twophase.solver": fake_solver,
+            },
+        ):
+            result = solve(_SCRAMBLED_CUBE)
+        assert result is None

@@ -109,9 +109,9 @@ to kociemba's canonical face-position index:
 - Raw MicroPython PWM duty (0-1023, from `Cubotino_settings.txt`) converts to ESPHome's
   -1.0..1.0 via `duty_to_esphome()` in C++ only.
 
-**kociemba solved-cube quirk**: the library returns a non-trivial move sequence for an
-already-solved cube string. `solve()` short-circuits with `_is_solved()` before calling
-`kociemba.solve()`.
+**Already-solved short-circuit**: `solve()` checks `_is_solved()` and returns `""`
+directly before ever calling the underlying solver, rather than relying on it to
+handle a trivial already-solved input correctly.
 
 ## Shared Data (`hass.data[DOMAIN][entry_id]`)
 
@@ -148,8 +148,8 @@ low-confidence (<0.15 margin) → `check_cube_parity()` → `CalibrationResult` 
 if valid → `build_kociemba_faces()` → fire `rubiks_calibrated`.
 
 **Solver** (Solve button): `kociemba_string()` → `_is_solved()` short-circuit →
-`kociemba.solve()` via executor job → solution string or `""` ("Already solved!") →
-fire `rubiks_solved`.
+`twophase.solver.solve()` via executor job (see `docs/features.md` "Solver
+dependency") → solution string or `""` ("Already solved!") → fire `rubiks_solved`.
 
 ## Scan Sequence (Phase 1/2 manual/webcam)
 
@@ -178,7 +178,7 @@ the same list the robot service schema validates against.
 | Exactly 54 stickers, 6×9 | After calibration | `parity_valid`/`parity_error` |
 | Structural cube validity | After calibration | `diagnose_cube_string()` |
 | Low-confidence stickers | After calibration | Flagged, not blocking |
-| Valid cube state | On Solve | `kociemba.solve()` raises if impossible |
+| Valid cube state | On Solve | Solver returns an error string if impossible (not an exception) |
 
 ## Services
 

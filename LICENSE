@@ -22,7 +22,12 @@ SOFTWARE.
 
 ---
 
-This project's software (Home Assistant integration + ESPHome component) is
-licensed as above. The physical mechanism and 3D-printed design are Andrea
-Favero's CUBOTino — see his Instructables page for the terms on the design
-itself: https://www.instructables.com/CUBOTino-Autonomous-Small-3D-Printed-Rubiks-Cube-R/
+This MIT license covers everything in this repository **except**
+`custom_components/rubiks/`, which is GPLv3+ (see the `LICENSE` file in that
+directory) — it depends on `twophase` (GPLv3+) for cube solving, since the
+alternative (`kociemba`) fails to install on Home Assistant OS. The ESPHome
+robot component, docs, and everything else stay MIT.
+
+The physical mechanism and 3D-printed design are Andrea Favero's CUBOTino —
+see his Instructables page for the terms on the design itself:
+https://www.instructables.com/CUBOTino-Autonomous-Small-3D-Printed-Rubiks-Cube-R/

@@ -49,3 +49,7 @@ CUBOTino_Files/
 # HA's own UI-automation-editor file — live local state, not part of this repo
 ha_automations/automations.yaml
 
+# Extracted from the bundled twophase_tables.tar.gz on first solve — generated locally,
+# not part of the repo (the .tar.gz itself IS tracked and intentionally committed).
+custom_components/rubiks/twophase_tables/
+
