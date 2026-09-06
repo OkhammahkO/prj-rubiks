@@ -30,11 +30,6 @@ User beware, most of the porting of this project and additional development and 
 2. Build the hardware - 3D-printed frame and servos per Andrea's "Top" version
 3. Calibrate - servo positions/timings, then colour detection.
 
-
-TODO:
- - Add hood 3d print
- - Review set up properly for HACs / ESPHome external componets
-
 ---
 
 ## Docs

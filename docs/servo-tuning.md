@@ -117,9 +117,12 @@ isn't a regression, just an unfinished feature — see `docs/features.md`.
   range) — clamped to exactly -1.0, the same output as `Bottom: Extra Sides`' release
   position (also clamped, since 10+extra_sides still couldn't clear the boundary with
   extra_sides capped at 15). CCW rotate and CCW release were physically identical moves
-  until this was found. Moved to `CCW Pos=28` (just inside range) to restore a real,
-  distinct release position — didn't fix the separate `Bottom: Release` timing-floor
-  issue below, but was a genuine bug in its own right.
+  until this was found — a genuine bug in its own right. Tried `CCW Pos=28` (just
+  inside range, restoring a real distinct release position) — didn't move the separate
+  `Bottom: Release` timing-floor issue below, so **reverted back to 10** (see tuning
+  log). The clamping bug itself is still real and could resurface if CCW Pos is ever
+  lowered again for an unrelated reason — worth re-checking the computed value against
+  ±1.0 whenever it changes.
 - **The `Bottom: Release` floor (~500ms) is not (or not only) about the release
   target's distance.** Doubling `Extra Sides`/`Extra Home` (4→8, 2→4) and fixing the
   CCW clamp above both landed cleanly but didn't move the floor — `Release` still can't
@@ -154,6 +157,23 @@ setting, computed servo position, and timing value in one shot — read that log
 of trusting any number written here. If you retune anything, also write the new value
 back into the YAML's `initial_value` once confirmed, so a fresh flash doesn't regress
 behind the dashboard.
+
+## Tuning log
+
+Running record of specific value changes while this is still being dialled in — newest
+first. Once tuning settles down, this can be trimmed back to just the current values
+note above; until then it's cheaper to log a change here than to lose track of why a
+number is what it is.
+
+- **2026-09-06** — `Top: Close-Flip` 400→**500ms**, `Top: Flip-Open` 300→**400ms**.
+  Fixed scan flips cutting short (see "Confirmed findings" — the redundant-open-step
+  bug had masked whether duration was ever the real problem; once that was fixed, a
+  clean retest showed it was). Found via push-high-then-dial-back: tested 800/600ms
+  first to confirm duration was the lever, then walked both down until they held.
+- **2026-09-06** — `Bottom: CCW Pos` 10→28→**10 (reverted)**. Tried un-clamping the
+  CCW release position (see "Confirmed findings"); didn't move the `Bottom: Release`
+  timing floor, so reverted rather than keep the (small) reduction in CCW travel for
+  no benefit.
 
 ## Believed-home safeguard
 
