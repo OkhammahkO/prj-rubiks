@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A two-sided system that scans a Rubik's cube with a fixed ESP32-CAM, solves it via
-kociemba, and (optionally) physically executes the solution with a CUBOTino-derived
-robot arm:
+A remake of Andrea Favero's CUBOTino — same 3D-printed frame and 2-servo mechanism,
+rebuilt on a single ESP32-S3-CAM board plus Home Assistant instead of a Raspberry Pi:
 
 - `custom_components/rubiks/` — a HACS Home Assistant integration (Python). Camera
   capture, CIELAB colour detection, calibration, and the kociemba solve pipeline.
-- `esphome/components/rubiks_solver/` — an external ESPHome C++ component running on a
-  second ESP32-S3. Drives the two robot servos (flip lever + turntable) to scan faces
-  and execute solved moves.
+- `esphome/components/rubiks_solver/` — an external ESPHome C++ component running on
+  the same ESP32-S3-CAM board (camera, servos, and TM1638 display all in one
+  `esphome/rubiks-solver.yaml`). Drives the two robot servos (flip lever + turntable)
+  to scan faces and execute solved moves.
 
 The two sides talk over the ESPHome native API (typed actions/events), bridged by
 `ha_automations/rubiks_robot.yaml` — never entity-state polling.
@@ -65,8 +65,6 @@ them over any assumption, and update them alongside behavioral changes rather th
   numbers — other docs point here instead of repeating them).
 - `docs/tm1638.md` — the display/buzzer/LEDs: pins, status→display/beep/LED mapping,
   physical-button actions, pipelined features.
-- `docs/archive/` — dated snapshots of the docs from before the 2026-08-15 rewrite, if
-  historical context on a specific past decision is needed.
 
 `CUBOTino_Files/ESP32_files/` (untracked, drop in manually) is Andrea Favero's original
 CUBOTino source — the ESPHome component is a deliberate port of `Cubotino_servos.py`/

@@ -37,8 +37,9 @@ integration, plus an optional LED entity override selector. LED entity auto-disc
 resolves the camera's device, finds `light` domain entities on it, auto-selects if
 exactly one.
 
-**Testing**: 32 pytest tests (colour detection, calibration, solver logic), 13 synthetic
-sample images in `tests/samples/`.
+**Testing**: run `pytest custom_components/rubiks/tests/ -v` for the current count
+(colour detection, calibration, solver logic) — not duplicated here since it drifts
+every time a test is added. 13 synthetic sample images in `tests/samples/`.
 
 **Open**: cube net display verification.
 
@@ -120,8 +121,9 @@ inventory of what exists:
 
 `solver_status` text sensor drives the TM1638 display, RTTTL beeps, and LED routines —
 full status→feedback mapping in `docs/tm1638.md`. Servo test buttons (raw position
-writes + planned cycles: rotate/spin/flip/scan-cycle/return-home). 18 single
-kociemba-notation move buttons (`U`/`U2`/`U3`.../`B3`) call `execute_solution()`
+writes + planned cycles: rotate/spin/flip/scan-cycle/return-home), plus one shared
+"Test: Run" button that dispatches based on a select entity's 18 single
+kociemba-notation move options (`U`/`U2`/`U3`.../`B3`) — calls `execute_solution()`
 directly for isolated move testing. 16 of 17 conceived calibration number entities are
 live (`Top: Release Offset` remains commented out — its parameter sits at 0, a no-op
 matching `Cubotino_settings.txt`'s own default); current values in `docs/servo-tuning.md`.
@@ -211,7 +213,7 @@ for whoever else works on this later — not blocking anything currently.
 
 | Issue | Notes |
 |-------|-------|
-| Red/Orange separation | ~20 LAB units apart on this camera — loading-position enforcement assigns labels by scan position, not centre classification, eliminating the ambiguity; LAB warning still fires if a scan looks wrong |
+| Red/Orange separation | Hardest colour pair on this camera (see `docs/spec.md` "Red/Orange Separation" for the actual L ranges) — loading-position enforcement assigns labels by scan position, not centre classification, eliminating the ambiguity; LAB warning still fires if a scan looks wrong |
 | White centre has brand logo | 5-point majority vote handles it but confidence may be low |
 | Full permutation parity not checked | `kociemba.solve()` rejects unsolvable states implicitly |
 | LED never auto-turns-off | User controls it via normal HA UI |

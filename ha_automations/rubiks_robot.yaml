@@ -1,14 +1,14 @@
 # Rubiks Robot — Home Assistant Automation Templates
 #
 # These automations bridge the HA custom component (custom_components/rubiks)
-# and the ESP32 ESPHome robot (esphome/rubiks_solver.yaml).
+# and the ESP32 ESPHome robot (esphome/rubiks-solver.yaml).
 #
 # How to use:
 #   1. Copy these automations into your HA config (UI editor or automations.yaml).
 #   2. Replace <entry_id> in service calls with your actual rubiks integration entry ID,
 #      or use the UI to find the correct rubiks.* service names.
-#   3. Adjust the esphome device name if you changed 'device_name' in substitutions
-#      (default: rubiks-solver → services are esphome.rubiks_solver_*)
+#   3. Adjust the esphome device name if you renamed the device in rubiks-solver.yaml's
+#      `esphome: name:` (default: rubiks-solver → services are esphome.rubiks_solver_*)
 #
 # Flow overview:
 #   HA calls start_scan  →  robot positions face 1  →  fires rubiks_face_ready

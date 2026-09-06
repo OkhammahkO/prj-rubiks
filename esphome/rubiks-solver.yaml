@@ -778,7 +778,7 @@ servo:
     min_level: 2.5% # 0.5 ms
     idle_level: 7.5% # 1.5 ms
     max_level: 12.5% # 2.5 ms
-    auto_detach_time: 5s # must exceed longest step duration (b_rotate_time 1200ms) to avoid mid-travel dropout
+    auto_detach_time: 5s # must exceed the longest step duration in use, or the servo can detach mid-travel
   - id: bottom_servo
     output: bottom_servo_output
     min_level: 2.5% # 0.5 ms

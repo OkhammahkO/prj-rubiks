@@ -298,8 +298,8 @@ void RubiksSolverComponent::advance_scan() {
     // sequence, which reaches White-up/Green-front with the turntable at home using only
     // whole-cube moves — no rotate, no D-layer side effect, no compensation needed:
     //   flip:       U=O,F=B,L=W,R=Y → U=G,F=O (L,R unchanged: L=W,R=Y)
-    //   spin_home (CW→HOME): U=G,F=O,L=W,R=Y → U=G,F=Y,L=O,R=B
-    //   flip:       U=G,F=Y,L=O,R=B → U=W,F=G  ← target ✓ (L,R unchanged: L=O,R=B)
+    //   spin_home (CW→HOME, i.e. spinCCW_effect): U=G,F=O,L=W,R=Y → U=G,F=Y,L=O,R=Rd
+    //   flip:       U=G,F=Y,L=O,R=Rd → U=W,F=G  ← target ✓ (L,R unchanged: L=O,R=Rd)
     //
     // Settle pads bracketing this sequence: the O-face close step just before this and
     // the final flip's own declared duration are both calibrated-duration estimates,

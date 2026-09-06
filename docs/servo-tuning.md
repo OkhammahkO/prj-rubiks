@@ -112,17 +112,48 @@ isn't a regression, just an unfinished feature — see `docs/features.md`.
   each time it got hit (now 5). Each move was confirmed against a real test, not
   guessed; if it needs to go further still, that's a stronger signal for re-seating the
   horn than for continuing to widen the floor.
+- **`Bottom: CCW Pos` at 10 was silently clamped.** ESPHome's `Servo::write()` clamps
+  every value to `[-1.0, 1.0]` before output. `CCW Pos=10` computed to -1.304 (out of
+  range) — clamped to exactly -1.0, the same output as `Bottom: Extra Sides`' release
+  position (also clamped, since 10+extra_sides still couldn't clear the boundary with
+  extra_sides capped at 15). CCW rotate and CCW release were physically identical moves
+  until this was found. Moved to `CCW Pos=28` (just inside range) to restore a real,
+  distinct release position — didn't fix the separate `Bottom: Release` timing-floor
+  issue below, but was a genuine bug in its own right.
+- **The `Bottom: Release` floor (~500ms) is not (or not only) about the release
+  target's distance.** Doubling `Extra Sides`/`Extra Home` (4→8, 2→4) and fixing the
+  CCW clamp above both landed cleanly but didn't move the floor — `Release` still can't
+  drop meaningfully below ~500ms without alignment issues. Leading theory: `Release` is
+  doubling as the mechanical settle/damping buffer after the fast full rotate, before
+  it's safe to open the cover — a real property of this build (frame rigidity, cube
+  holder mass, swing speed), not a distance-proportional travel time. Unresolved;
+  worth retesting after any change to `Bottom: Rotate` itself (less momentum in might
+  mean less settle needed after).
+- **Scan flips did an unwanted extra reversal.** `plan_flip_()` always auto-opened the
+  cover after the last flip unless a rotate immediately followed — during scanning the
+  caller closes the cover again right after anyway, so every scan flip did
+  FLIP→OPEN→CLOSE (two reversals) instead of FLIP→CLOSE. Looked like "the flip cuts
+  short and goes back down." Fixed by adding a scan-only `next_token=='X'` sentinel to
+  `plan_flip_()` that leaves the arm at FLIP for the caller's own
+  `plan_ensure_cover_closed_()` to finish directly. Doesn't affect solve/scramble —
+  `'X'` never appears in a real kociemba move string.
+- **A redundant top "release" step was costing a full leg's duration for zero
+  motion.** `plan_ensure_cover_closed_()` and `plan_flip_()`'s close-then-rotate branch
+  both queued a second top-servo step at the release position — but with `Top: Release
+  Offset` at its permanent `0`, that position is identical to Close, so the step never
+  actually moved anything. Now skipped whenever the offset is `0` (i.e. always, until
+  that feature is finished) — removes one full `Top: Open-Close`/`Top: Flip-Close`
+  duration of dead time per bottom-layer turn, at zero cost.
 
 ## Current values
 
-The YAML's `initial_value` for every entity below is now kept in sync with the
-last-confirmed-working live value (updated 2026-08-15) — treat the YAML itself as the
-source of truth rather than duplicating numbers here, since they'll only go stale again.
-Current known-good set: `CCW Pos=10`, `CW Pos=110`, `Home Pos=77`, `Extra Sides=4`,
-`Extra Home=2`, `Spin=700ms`, `Rotate=700ms`, `Release=700ms`, `Speed Multiplier=1.0`,
-`Top: Close Pos=77`, other Top values unchanged from original defaults. If you retune
-anything, write the new value back into the YAML's `initial_value` once confirmed so a
-fresh flash doesn't regress behind the dashboard.
+Numbers here go stale the moment anyone retunes a slider, so none are duplicated in
+this doc anymore. To see what's actually live right now: press **Report: Servo
+Parameters** on the dashboard, which calls `dump_config()` and logs every raw duty
+setting, computed servo position, and timing value in one shot — read that log instead
+of trusting any number written here. If you retune anything, also write the new value
+back into the YAML's `initial_value` once confirmed, so a fresh flash doesn't regress
+behind the dashboard.
 
 ## Believed-home safeguard
 

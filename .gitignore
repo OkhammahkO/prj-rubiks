@@ -46,3 +46,6 @@ esphome/.esphome/
 # Third-party reference source, dropped in manually — not part of this repo
 CUBOTino_Files/
 
+# HA's own UI-automation-editor file — live local state, not part of this repo
+ha_automations/automations.yaml
+

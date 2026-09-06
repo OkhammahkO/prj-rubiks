@@ -5,10 +5,10 @@
     "@OkhammahkO"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/OkhammahkO/rubiks",
+  "documentation": "https://github.com/OkhammahkO/prj-rubiks",
   "integration_type": "device",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/OkhammahkO/rubiks/issues",
+  "issue_tracker": "https://github.com/OkhammahkO/prj-rubiks/issues",
   "requirements": ["kociemba>=1.0", "Pillow>=10.0.0"],
   "version": "0.4.0"
 }
