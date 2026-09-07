@@ -216,10 +216,11 @@ void RubiksSolverComponent::loop() {
   }
   if (crossed_boundary && moves_remaining_sensor_) {
     int remaining = robot_move_count_ - (int) robot_actions_done_;
-    // TEMP diagnostic (2026-09-07) — Moves Remaining reads 0 for the whole solve on
-    // real hardware; this pins down whether robot_actions_done_ is overshooting
-    // action_boundaries_ too fast, or robot_move_count_ was wrong from the start.
-    // Remove once root-caused — see docs/tm1638.md "Known bug".
+    // Diagnostic log, kept intentionally (2026-09-07) — added to root-cause a bug
+    // where Moves Remaining stuck at 0 (a rejected concurrent execute_solution() call
+    // was zeroing the shared counter; see docs/tm1638.md "Fixed bug"). Left in since
+    // it's low-volume (one line per action, not per step) and cheap insurance against
+    // a repeat.
     ESP_LOGI(TAG, "moves_remaining: step_idx=%d robot_actions_done=%d/%d robot_move_count=%d remaining=%d",
              (int) step_idx_, (int) robot_actions_done_, (int) action_boundaries_.size(),
              robot_move_count_, remaining);
