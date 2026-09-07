@@ -170,8 +170,9 @@ Pinout, power, and calibration history: `docs/robot.md` "Hardware",
 ### TM1638 display + buzzer + LEDs
 
 Display, buzzer, LED routines, physical-button actions, transient error/rejection
-feedback, the solve timer, and brightness control all implemented — full detail and
-current status→feedback mapping in `docs/tm1638.md`.
+feedback, and brightness control all implemented — full detail and current
+status→feedback mapping in `docs/tm1638.md`. A solve-timer alternation was tried and
+rolled back — see `docs/tm1638.md`'s "Moves Remaining" note.
 
 ### Future features (post-launch)
 

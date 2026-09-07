@@ -395,7 +395,6 @@ void RubiksSolverComponent::execute_solution(const std::string &solution) {
   ESP_LOGI(TAG, "planned %d steps (%d robot moves)", (int) steps_.size(), robot_move_count_);
   step_idx_      = 0;
   step_start_ms_ = 0;
-  solve_start_ms_ = millis();
   state_         = SolverState::SOLVING;
   enable_loop();
 }

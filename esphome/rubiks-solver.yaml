@@ -78,9 +78,8 @@ display:
   lambda: |-
     // Priority order: boot splash > connect confirmation > API lost > transient
     // message (rejected command / already-solved / HA-reported scan-solve error —
-    // see show_transient_message() in rubiks_solver.h) > moves-left/elapsed-time
-    // alternation while solving > plain status text (IDLE/LOAD, SCAN N, FACE Nc,
-    // HOMING, ...).
+    // see show_transient_message() in rubiks_solver.h) > moves-left while solving >
+    // plain status text (IDLE/LOAD, SCAN N, FACE Nc, HOMING, ...).
     std::string s;
     bool solving = id(solver_status_text).has_state() && id(solver_status_text).state == "SOLVING";
     if (id(g_show_boot)) {
@@ -91,18 +90,9 @@ display:
       s = "LOST API";
     } else if (!id(solver).transient_message().empty()) {
       s = id(solver).transient_message();
-    } else if (solving) {
-      char buf[16];
-      // Alternate every 2s between moves-left and elapsed solve time — both are
-      // useful, neither fits alongside the other in 8 digits.
-      if ((millis() / 2000) % 2 == 1) {
-        uint32_t elapsed_s = (millis() - id(solver).solve_start_ms()) / 1000;
-        snprintf(buf, sizeof(buf), "TIME%3u", (unsigned) elapsed_s);
-      } else if (id(moves_remaining).has_state()) {
-        snprintf(buf, sizeof(buf), "LEFT%3d", (int) id(moves_remaining).state);
-      } else {
-        snprintf(buf, sizeof(buf), "SOLVING");
-      }
+    } else if (solving && id(moves_remaining).has_state()) {
+      char buf[9];
+      snprintf(buf, sizeof(buf), "LEFT%3d", (int) id(moves_remaining).state);
       s = buf;
     } else {
       std::string status = id(solver_status_text).has_state() ? id(solver_status_text).state : std::string("IDLE");

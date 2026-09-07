@@ -109,11 +109,6 @@ class RubiksSolverComponent : public Component, public api::CustomAPIDevice {
   void show_transient_message(const std::string &msg, uint32_t duration_ms = 1500);
   const std::string &transient_message() const { return transient_message_; }
 
-  // millis() timestamp execute_solution() started at — 0 if never run this boot. Lets
-  // the display lambda compute elapsed solve time itself rather than pushing a
-  // continuously-updating value from here every loop() tick.
-  uint32_t solve_start_ms() const { return solve_start_ms_; }
-
  protected:
   // ── Hardware ──────────────────────────────────────────────────────────────────
   servo::Servo              *top_servo_     {nullptr};
@@ -215,7 +210,6 @@ class RubiksSolverComponent : public Component, public api::CustomAPIDevice {
   std::string            solution_             {};
   bool                   solution_accepted_    {false};
   int                    robot_move_count_     {0};
-  uint32_t               solve_start_ms_       {0};
   std::string            transient_message_    {};
 
   // Progress tracking for moves_remaining_sensor_ — populated once per plan_solution_()
