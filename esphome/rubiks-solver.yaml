@@ -186,10 +186,13 @@ interval:
           then:
             - if:
                 condition:
-                  lambda: "return global_api_server->is_connected();"
+                  lambda: "return global_api_server->is_connected() && !id(tm1638_led_8).state;"
                 then:
                   - switch.turn_on: tm1638_led_8
-                else:
+            - if:
+                condition:
+                  lambda: "return !global_api_server->is_connected() && id(tm1638_led_8).state;"
+                then:
                   - switch.turn_off: tm1638_led_8
 
       # LED 7 — solid on while believed home, blinks while IDLE-but-not-home, off
@@ -214,10 +217,13 @@ interval:
           then:
             - if:
                 condition:
-                  lambda: "return id(believed_home).state;"
+                  lambda: "return id(believed_home).state && !id(tm1638_led_7).state;"
                 then:
                   - switch.turn_on: tm1638_led_7
-                else:
+            - if:
+                condition:
+                  lambda: "return !id(believed_home).state && id(tm1638_led_7).state;"
+                then:
                   - switch.turn_off: tm1638_led_7
 
 sensor:

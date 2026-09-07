@@ -29,7 +29,9 @@ Six positions, 0-indexed, matching `scan_face_idx_` in `rubiks_solver.cpp` and
 `SCAN_SEQUENCE` in `const.py` (one shared list for both the manual button and the robot
 service schema). The HA status sensor is 1-indexed (`"SCAN " + (scan_face_idx_ + 1)`).
 
-**Flip**: Front→Bottom, Top→Front, Back→Top, Bottom→Back. Left/Right unchanged.
+**Flip**: Front→Bottom, Top→Front, Back→Top, Bottom→Back. Left/Right unchanged. (The
+physical push that produces this — a lever swinging up through the turntable to tip the
+cube forward — is described in `docs/robot.md` "Physical Mechanism".)
 **Spin CW** (viewed from above): Front→Right→Back→Left→Front. Top/Bottom unchanged.
 
 | Pos | Face (Top) | Front | Back | Left | Right | Motion from previous |

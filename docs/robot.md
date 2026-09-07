@@ -86,11 +86,44 @@ trade-off costs).
 
 ---
 
+## Physical Mechanism
+
+Two moving assemblies, one servo each:
+
+- **Top servo** drives what functions as two different things depending on where it's
+  positioned in its swing: a **cover** that drops down from above (Close position,
+  clamping the top two layers still against the frame) or lifts clear (Open), and a
+  separate, smaller **flip lever** that swings up *from below* — passing through slots
+  in the turntable — to reach the cube (Flip position). At Open, both are out of the
+  way at once: the cover is raised clear above, and the flip lever sits retracted
+  *below* the turntable, not poking through it — which is exactly why Open is the only
+  position the turntable can safely spin freely in.
+- **Bottom servo** drives the **turntable**, which holds the cube at all times and
+  rotates to three meaningful angles: Home (centre) and ~90° CW/CCW either side.
+
+How the three primitives below actually happen:
+- **Rotate** — cover drops to Close, clamping the top two layers; turntable spins.
+  Since the top two layers are held still, only the bottom layer actually turns
+  relative to them — this is the only way this 2-servo design turns a single layer.
+- **Spin** — cover lifts to Open (nothing touching the cube); turntable spins. With
+  nothing clamped, the whole cube turns together as one block instead.
+- **Flip** — turntable stays completely still, holding the cube; the flip lever swings
+  up through the turntable's slots and pushes upward on the cube's back-bottom edge,
+  tipping it forward over its front-bottom edge like tipping a box — front face ends
+  up on the bottom (see `docs/orientation.md` for the full before/after mapping).
+
+**Both the cover *and* the flip lever need the turntable at one of its three aligned
+angles to do their job safely** — the cover because it clamps down around the cube
+sitting in the turntable, the flip lever because it has to physically pass through the
+turntable's slots to reach underneath. A turntable caught between slots would jam
+either motion, not just a rotate. See `docs/collision-prevention.md` for the timing
+guards this requires.
+
 ## Robot Primitives
 
-| Token | Meaning | Top cover | Bottom servo |
+| Token | Meaning | Top servo | Bottom servo |
 |-------|---------|-----------|--------------|
-| `F<n>` | Flip cube n times (front → bottom) | Open | Stationary |
+| `F<n>` | Flip cube n times (front → bottom) | Flip (turntable-safe, same as Open) | Stationary |
 | `S<1\|3>` | Spin full cube CW(1)/CCW(3) 90° | Open | Moves |
 | `R<1\|3>` | Rotate bottom layer CW(1)/CCW(3) 90° | Closed (constrains top 2 layers) | Moves |
 

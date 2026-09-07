@@ -4,17 +4,25 @@ How the top servo (flip lever) and bottom servo (turntable) are kept from collid
 
 ## The physical mechanism
 
-The flip lever and turntable slot only interlock safely two ways:
+Full description in `docs/robot.md` "Physical Mechanism" — short version: the top
+servo drives two different things depending on position (a cover that clamps down from
+above, and a separate smaller flip lever that swings up from below, through slots in
+the turntable), and the bottom servo drives the turntable the cube always sits in.
 
-- **Open** — lever fully retracted; turntable can spin freely.
-- **Closed** — lever dropped through the slot, locking the top two layers while the
-  turntable turns just the bottom.
+Both the cover *and* the flip lever need the turntable at a slot-aligned angle
+(home/CW/CCW) to reach the cube safely — the cover because it clamps down around
+whatever's sitting in the turntable, the flip lever because it has to physically pass
+through the turntable's slots. So a collision can happen from any of:
 
-A collision happens either from (1) the lever trying to close while the turntable isn't
-at a slot-aligned angle (home/CW/CCW), or (2) the turntable moving before the lever has
-actually finished clearing, even with correct final positions. Position correctness is
-handled by the planner always using slot-aligned targets (`docs/robot.md`); everything
-below is about timing.
+1. The **cover** closing while the turntable isn't slot-aligned.
+2. The **flip lever** swinging up while the turntable isn't slot-aligned — same
+   underlying risk as (1), just the other top-servo position that reaches through the
+   turntable.
+3. The turntable moving before whichever of the two has actually finished clearing,
+   even when both end positions were correct.
+
+Position correctness (1 and 2) is handled by the planner always using slot-aligned
+targets (`docs/robot.md`); everything below is about timing (3).
 
 ## Two independent timing layers
 
