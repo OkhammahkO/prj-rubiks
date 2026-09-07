@@ -216,6 +216,13 @@ void RubiksSolverComponent::loop() {
   }
   if (crossed_boundary && moves_remaining_sensor_) {
     int remaining = robot_move_count_ - (int) robot_actions_done_;
+    // TEMP diagnostic (2026-09-07) — Moves Remaining reads 0 for the whole solve on
+    // real hardware; this pins down whether robot_actions_done_ is overshooting
+    // action_boundaries_ too fast, or robot_move_count_ was wrong from the start.
+    // Remove once root-caused — see docs/tm1638.md "Known bug".
+    ESP_LOGI(TAG, "moves_remaining: step_idx=%d robot_actions_done=%d/%d robot_move_count=%d remaining=%d",
+             (int) step_idx_, (int) robot_actions_done_, (int) action_boundaries_.size(),
+             robot_move_count_, remaining);
     moves_remaining_sensor_->publish_state(remaining < 0 ? 0 : remaining);
   }
 
@@ -348,27 +355,32 @@ void RubiksSolverComponent::advance_scan() {
 void RubiksSolverComponent::execute_solution(const std::string &solution) {
   // Both guards below clear these explicitly rather than leaving them at whatever a
   // previous call left behind — api.respond reports them unconditionally, so a rejected
-  // call must not report a stale prior success.
+  // call must not report a stale prior success. Deliberately NOT touching
+  // robot_move_count_ here — a rejected call (e.g. a duplicate/retried service call
+  // arriving while a previous solve is still SOLVING) must not zero out the counter
+  // the currently-running solve's Moves Remaining display depends on. Confirmed via
+  // live log: robot_move_count=0 mid-run while action_boundaries_ still had the
+  // original plan's full 112 entries — see docs/tm1638.md's bug note.
   if (state_ != SolverState::IDLE) {
     ESP_LOGW(TAG, "execute_solution ignored — not idle (state=%d); call stop() first", (int) state_);
-    solution_accepted_ = false;
-    robot_move_count_  = 0;
+    last_call_accepted_   = false;
+    last_call_move_count_ = 0;
     show_transient_message("BUSY");
     return;
   }
   if (needs_confirm_before_move_) {
     ESP_LOGW(TAG, "execute_solution ignored — call confirm_safe_and_home() first "
                   "(position unconfirmed after a reset or an abort)");
-    solution_accepted_ = false;
-    robot_move_count_  = 0;
+    last_call_accepted_   = false;
+    last_call_move_count_ = 0;
     show_transient_message("NOT HOME");
     return;
   }
   if (!believed_home_) {
     ESP_LOGW(TAG, "execute_solution ignored — call confirm_safe_and_home() first "
                   "(not believed to be home, e.g. after a test move)");
-    solution_accepted_ = false;
-    robot_move_count_  = 0;
+    last_call_accepted_   = false;
+    last_call_move_count_ = 0;
     show_transient_message("NOT HOME");
     return;
   }
@@ -384,8 +396,9 @@ void RubiksSolverComponent::execute_solution(const std::string &solution) {
 
   plan_solution_();
 
-  solution_accepted_ = !steps_.empty();
-  if (!solution_accepted_) {
+  last_call_accepted_   = !steps_.empty();
+  last_call_move_count_ = robot_move_count_;
+  if (!last_call_accepted_) {
     ESP_LOGW(TAG, "no steps planned — solution may be empty or invalid");
     publish_status_("IDLE");
     show_transient_message("SOLVED");

@@ -97,9 +97,13 @@ class RubiksSolverComponent : public Component, public api::CustomAPIDevice {
   // Called from setup() and from HA number entity on_value lambdas.
   void recompute_positions();
 
-  // Accessors for api.respond in execute_solution action.
-  bool solution_accepted() const { return solution_accepted_; }
-  int  move_count()        const { return robot_move_count_; }
+  // Accessors for api.respond in execute_solution action. Deliberately separate from
+  // robot_move_count_ (the currently *executing* plan's live action count, used by
+  // moves_remaining_sensor_) — these report only THIS call's own outcome, so a call
+  // rejected while a previous solve/scramble is still running can't corrupt that
+  // solve's in-progress countdown. See the 2026-09-07 bug note in docs/tm1638.md.
+  bool solution_accepted() const { return last_call_accepted_; }
+  int  move_count()        const { return last_call_move_count_; }
 
   // Briefly overrides the display with `msg` (highest priority short of boot/ready/API
   // status — see the display lambda), reverting automatically after duration_ms. Used
@@ -208,8 +212,9 @@ class RubiksSolverComponent : public Component, public api::CustomAPIDevice {
   int                    scan_face_idx_        {0};
   int                    test_scan_face_idx_   {0};  // persists between test_scan_cycle() presses
   std::string            solution_             {};
-  bool                   solution_accepted_    {false};
   int                    robot_move_count_     {0};
+  bool                   last_call_accepted_   {false};
+  int                    last_call_move_count_ {0};
   std::string            transient_message_    {};
 
   // Progress tracking for moves_remaining_sensor_ — populated once per plan_solution_()
