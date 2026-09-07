@@ -150,6 +150,16 @@ void RubiksSolverComponent::publish_status_(const std::string &s) {
     status_sensor_->publish_state(s);
 }
 
+// Briefly overrides the display (see the display lambda's priority chain in
+// rubiks-solver.yaml) without touching solver_status_text/state_ — used for feedback
+// that isn't a real state transition (a rejected command, an already-solved no-op).
+// set_timeout() with a fixed name means a second call restarts the same timer rather
+// than stacking, so a burst of rejected presses just extends the display, not queues it.
+void RubiksSolverComponent::show_transient_message(const std::string &msg, uint32_t duration_ms) {
+  transient_message_ = msg;
+  this->set_timeout("transient_msg", duration_ms, [this]() { transient_message_.clear(); });
+}
+
 // Optimistic only — see the field comment in the header. Not a physical confirmation.
 void RubiksSolverComponent::set_believed_home_(bool home) {
   believed_home_ = home;
@@ -229,16 +239,19 @@ void RubiksSolverComponent::loop() {
 void RubiksSolverComponent::start_scan() {
   if (state_ != SolverState::IDLE) {
     ESP_LOGW(TAG, "start_scan ignored — not idle (state=%d); call stop() first", (int) state_);
+    show_transient_message("BUSY");
     return;
   }
   if (needs_confirm_before_move_) {
     ESP_LOGW(TAG, "start_scan ignored — call confirm_safe_and_home() first "
                   "(position unconfirmed after a reset or an abort)");
+    show_transient_message("NOT HOME");
     return;
   }
   if (!believed_home_) {
     ESP_LOGW(TAG, "start_scan ignored — call confirm_safe_and_home() first "
                   "(not believed to be home, e.g. after a test move)");
+    show_transient_message("NOT HOME");
     return;
   }
   ESP_LOGI(TAG, "start_scan");
@@ -340,6 +353,7 @@ void RubiksSolverComponent::execute_solution(const std::string &solution) {
     ESP_LOGW(TAG, "execute_solution ignored — not idle (state=%d); call stop() first", (int) state_);
     solution_accepted_ = false;
     robot_move_count_  = 0;
+    show_transient_message("BUSY");
     return;
   }
   if (needs_confirm_before_move_) {
@@ -347,6 +361,7 @@ void RubiksSolverComponent::execute_solution(const std::string &solution) {
                   "(position unconfirmed after a reset or an abort)");
     solution_accepted_ = false;
     robot_move_count_  = 0;
+    show_transient_message("NOT HOME");
     return;
   }
   if (!believed_home_) {
@@ -354,6 +369,7 @@ void RubiksSolverComponent::execute_solution(const std::string &solution) {
                   "(not believed to be home, e.g. after a test move)");
     solution_accepted_ = false;
     robot_move_count_  = 0;
+    show_transient_message("NOT HOME");
     return;
   }
   ESP_LOGI(TAG, "execute_solution: %s", solution.c_str());
@@ -371,12 +387,15 @@ void RubiksSolverComponent::execute_solution(const std::string &solution) {
   solution_accepted_ = !steps_.empty();
   if (!solution_accepted_) {
     ESP_LOGW(TAG, "no steps planned — solution may be empty or invalid");
+    publish_status_("IDLE");
+    show_transient_message("SOLVED");
     return;
   }
 
   ESP_LOGI(TAG, "planned %d steps (%d robot moves)", (int) steps_.size(), robot_move_count_);
   step_idx_      = 0;
   step_start_ms_ = 0;
+  solve_start_ms_ = millis();
   state_         = SolverState::SOLVING;
   enable_loop();
 }
@@ -663,8 +682,11 @@ void RubiksSolverComponent::fire_ha_event_(const std::string &event, const std::
 
 void RubiksSolverComponent::fire_done_() {
   if (state_ == SolverState::SCANNING && scan_face_idx_ < NUM_FACES) {
-    // Face in position — publish "FACE N" to trigger beep via on_state automation
-    publish_status_("FACE " + std::to_string(scan_face_idx_ + 1));
+    // Face in position — publish "FACE Nc" (c = colour letter, e.g. "FACE 4G") to
+    // trigger beep via on_state automation. The LED-progress-bar parsing in
+    // rubiks-solver.yaml uses atoi() on this string, which stops at the first
+    // non-digit char, so appending the letter directly after N doesn't break it.
+    publish_status_("FACE " + std::to_string(scan_face_idx_ + 1) + SCAN_FACES[scan_face_idx_]);
     fire_ha_event_("esphome.rubiks_face_ready", SCAN_FACES[scan_face_idx_]);
     state_ = SolverState::SCAN_WAIT;
     disable_loop();

@@ -169,19 +169,18 @@ Pinout, power, and calibration history: `docs/robot.md` "Hardware",
 
 ### TM1638 display + buzzer + LEDs
 
-Display, buzzer, LED routines, and physical-button actions all implemented — full
-detail, current status→feedback mapping, and remaining pipelined items in
-`docs/tm1638.md`.
+Display, buzzer, LED routines, physical-button actions, transient error/rejection
+feedback, the solve timer, and brightness control all implemented — full detail and
+current status→feedback mapping in `docs/tm1638.md`.
 
 ### Future features (post-launch)
 
 Not yet implemented, roughly in priority order: solve statistics sensors (time, move
 count, personal best, history), calibration-health monitoring (auto-prompt
 recalibration on drift or LED brightness change), dry-run mode (log moves without
-moving servos), demo/fun modes (scramble-solve loop, speed leaderboard). Physical
-TM1638 buttons and LED-bar progress indication are implemented — see `docs/tm1638.md`
-for remaining pipelined items in that space (true standalone-without-HA operation
-isn't one of them — the button actions route through HA, they don't bypass it).
+moving servos), demo/fun modes (scramble-solve loop, speed leaderboard). True
+standalone-without-HA operation isn't planned — the TM1638 button actions route
+through HA, they don't bypass it.
 
 #### Scrambler — implemented (plain random-move version)
 

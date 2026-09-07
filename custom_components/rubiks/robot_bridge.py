@@ -11,8 +11,10 @@ only people who re-copy the file.
 Flow (unchanged from the old YAML — see docs/robot.md for the full sequence):
   HA calls start_scan  ->  robot positions face 1  ->  fires rubiks_face_ready
   -> snapshot + detect -> calls face_scan_done  -> repeat x6
-  -> robot fires rubiks_scan_complete -> solve -> execute_solution
-  -> robot executes -> fires rubiks_solve_done
+  -> 6th face triggers calibration -> fires rubiks_calibrated (SCAN ERR shown on the
+     robot's display if parity is invalid)
+  -> robot fires rubiks_scan_complete -> solve (SOLVE ERR shown on failure)
+  -> execute_solution -> robot executes -> fires rubiks_solve_done
 
   HA robot buttons fire HA events, relayed here to esphome.<device>_<action>:
   rubiks_robot_start_requested -> esphome start_scan
@@ -84,6 +86,13 @@ def async_setup_robot_bridge(hass: HomeAssistant, entry: ConfigEntry) -> None:
             blocking=True,
         )
 
+    async def _on_calibrated(event: Event) -> None:
+        # Fired by _async_run_calibration() once the 6th face is processed, before the
+        # robot has finished its physical return-home — surfaces a bad scan as early as
+        # possible rather than waiting for the solve attempt to fail downstream.
+        if not event.data.get("parity_valid", True):
+            await _esphome_action("show_message", {"message": "SCAN ERR"})
+
     async def _on_face_ready(event: Event) -> None:
         if scan_lock.locked():  # mirrors the old automation's mode: single / silent
             return
@@ -108,6 +117,7 @@ def async_setup_robot_bridge(hass: HomeAssistant, entry: ConfigEntry) -> None:
             )
             if not result or "error" in result:
                 _LOGGER.warning("Rubiks: solve failed after scan — %s", result)
+                await _esphome_action("show_message", {"message": "SOLVE ERR"})
                 return
             await _esphome_action("execute_solution", {"solution": result["solution"]})
             _LOGGER.info(
@@ -133,6 +143,7 @@ def async_setup_robot_bridge(hass: HomeAssistant, entry: ConfigEntry) -> None:
         await _esphome_action("execute_solution", {"solution": event.data["solution"]})
 
     listeners = (
+        (f"{DOMAIN}_calibrated", _on_calibrated),
         ("esphome.rubiks_face_ready", _on_face_ready),
         ("esphome.rubiks_scan_complete", _on_scan_complete),
         ("esphome.rubiks_solve_done", _on_solve_done),

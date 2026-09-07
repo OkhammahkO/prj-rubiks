@@ -2,7 +2,7 @@ esphome:
   name: rubiks-solver
   project:
     name: "okhammahko.rubiks_solver"
-    version: "0.4.14"
+    version: "0.4.15"
   on_boot:
     then:
       - script.execute: show_boot_text
@@ -76,8 +76,11 @@ display:
   update_interval: 500ms
 
   lambda: |-
-    // Priority order: boot splash > connect confirmation > API lost > moves
-    // countdown while solving > plain status text (IDLE, SCAN N, FACE N, HOMING, ...).
+    // Priority order: boot splash > connect confirmation > API lost > transient
+    // message (rejected command / already-solved / HA-reported scan-solve error —
+    // see show_transient_message() in rubiks_solver.h) > moves-left/elapsed-time
+    // alternation while solving > plain status text (IDLE/LOAD, SCAN N, FACE Nc,
+    // HOMING, ...).
     std::string s;
     bool solving = id(solver_status_text).has_state() && id(solver_status_text).state == "SOLVING";
     if (id(g_show_boot)) {
@@ -86,12 +89,26 @@ display:
       s = "READY";
     } else if (!global_api_server->is_connected()) {
       s = "LOST API";
-    } else if (solving && id(moves_remaining).has_state()) {
-      char buf[9];
-      snprintf(buf, sizeof(buf), "LEFT%3d", (int) id(moves_remaining).state);
+    } else if (!id(solver).transient_message().empty()) {
+      s = id(solver).transient_message();
+    } else if (solving) {
+      char buf[16];
+      // Alternate every 2s between moves-left and elapsed solve time — both are
+      // useful, neither fits alongside the other in 8 digits.
+      if ((millis() / 2000) % 2 == 1) {
+        uint32_t elapsed_s = (millis() - id(solver).solve_start_ms()) / 1000;
+        snprintf(buf, sizeof(buf), "TIME%3u", (unsigned) elapsed_s);
+      } else if (id(moves_remaining).has_state()) {
+        snprintf(buf, sizeof(buf), "LEFT%3d", (int) id(moves_remaining).state);
+      } else {
+        snprintf(buf, sizeof(buf), "SOLVING");
+      }
       s = buf;
     } else {
-      s = id(solver_status_text).has_state() ? id(solver_status_text).state : std::string("IDLE");
+      std::string status = id(solver_status_text).has_state() ? id(solver_status_text).state : std::string("IDLE");
+      // Prompt to place the cube once idle and confirmed home — "READY" is already
+      // taken (post-connect confirmation), so this reuses the IDLE slot instead.
+      s = (status == "IDLE" && id(believed_home).state) ? "LOAD" : status;
     }
     s.resize(8, ' ');  // right-pad — the TM1638 shows all 8 digits regardless
     it.print(s.c_str());
@@ -137,6 +154,16 @@ api:
     - action: confirm_safe_and_home
       then:
         - lambda: "id(solver).confirm_safe_and_home();"
+
+    # HA-reported feedback (scan/solve errors detected on the HA side, e.g. a bad
+    # parity read or a solver failure) — see robot_bridge.py. Longer dwell than the
+    # firmware's own rejected-command messages since this arrives after a round trip
+    # to HA and is more likely to matter to someone not watching the display live.
+    - action: show_message
+      variables:
+        message: string
+      then:
+        - lambda: "id(solver).show_transient_message(message, 3000);"
 
 external_components:
   - source:
@@ -230,7 +257,7 @@ sensor:
   - platform: uptime
     type: seconds
     name: Uptime
-    update_interval: 1s
+    update_interval: 5s
 
 script:
   # ── Button press feedback ─────────────────────────────────────────────────────
@@ -1207,6 +1234,21 @@ number:
     step: 0.1
     on_value:
       - lambda: "id(solver).set_speed_multiplier(x);"
+
+  # ── Display brightness ───────────────────────────────────────────────────────
+  - platform: template
+    name: "Display Brightness"
+    entity_category: config
+    icon: mdi:brightness-6
+    optimistic: true
+    restore_value: true
+    mode: box
+    initial_value: 1
+    min_value: 0
+    max_value: 7
+    step: 1
+    on_value:
+      - lambda: "id(tm1638_display).set_intensity((uint8_t) x);"
 
 # ── Diagnostic selects ───────────────────────────────────────────────────────
 # Pair each select with its "Go" / "Run" execute button above.
