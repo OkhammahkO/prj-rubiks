@@ -728,9 +728,9 @@ def _write_file(path: str, data: bytes) -> None:
 
 
 # ── Robot control buttons ─────────────────────────────────────────────────────
-# These fire HA events consumed by ha_automations/rubiks_robot.yaml, which
-# translates them to ESPHome service calls. This keeps ESPHome service names
-# (device-specific) out of the Python component.
+# These fire HA events consumed by robot_bridge.py, which translates them to
+# esphome.<device>_* service calls (device name is a config option there, not
+# hardcoded here).
 
 
 class RobotStartScanButton(RubiksButtonBase):

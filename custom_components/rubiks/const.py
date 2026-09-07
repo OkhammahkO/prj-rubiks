@@ -78,6 +78,13 @@ LED_BRIGHTNESS = "led_brightness"
 LED_STABILISE_DELAY = "led_stabilise_delay"
 LED_ENTITY_ID = "led_entity_id"
 
+# ESPHome device name for the robot — HA turns hyphens to underscores when building
+# service names, e.g. device name "rubiks-solver" → esphome.rubiks_solver_start_scan.
+# Configurable since renaming the device in rubiks-solver.yaml's `esphome: name:`
+# changes this prefix; used to build the esphome.* service names the robot bridge calls.
+ESPHOME_DEVICE_NAME = "esphome_device_name"
+DEFAULT_ESPHOME_DEVICE_NAME = "rubiks_solver"
+
 # Scramble number entity key
 SCRAMBLE_MOVE_COUNT = "scramble_move_count"
 

@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from .button import async_handle_robot_scan_face, async_handle_solve
 from .cal_store import CalibrationStore
 from .const import DOMAIN, LED_ENTITY_ID, SCAN_SEQUENCE
+from .robot_bridge import async_setup_robot_bridge
 
 PLATFORMS: list[Platform] = [
     Platform.BUTTON,
@@ -49,6 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+    async_setup_robot_bridge(hass, entry)
 
     if not hass.services.has_service(DOMAIN, "robot_scan_face"):
 

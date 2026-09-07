@@ -15,7 +15,7 @@ rebuilt on a single ESP32-S3-CAM board plus Home Assistant instead of a Raspberr
   to scan faces and execute solved moves.
 
 The two sides talk over the ESPHome native API (typed actions/events), bridged by
-`ha_automations/rubiks_robot.yaml` — never entity-state polling.
+`custom_components/rubiks/robot_bridge.py` — never entity-state polling.
 
 ## Commands
 

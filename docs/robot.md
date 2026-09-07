@@ -198,21 +198,38 @@ class RubiksSolverComponent : public Component, public api::CustomAPIDevice { ..
 this->fire_homeassistant_event("esphome.rubiks_face_ready", {{"face", "G"}});
 ```
 
-### HA automations (`ha_automations/rubiks_robot.yaml`)
+### The robot bridge (`custom_components/rubiks/robot_bridge.py`)
 
-Six automations bridge the two sides — the only place `esphome.rubiks_solver_*` service
-names appear, so an ESPHome device rename only touches this file. Dev setup:
-`configuration.yaml` uses `automation: !include_dir_merge_list ha_automations/`, with
-`config/ha_automations` symlinked to this repo's `ha_automations/`.
+Was previously a separate `ha_automations/rubiks_robot.yaml` the user had to copy into
+their own config (and edit if they renamed the ESPHome device) — moved into the
+integration itself so installing via HACS is enough on its own, and a future fix here
+reaches everyone on update rather than only people who re-copy the file. The ESPHome
+device name became a config option (`ESPHOME_DEVICE_NAME`, default `rubiks_solver`)
+instead of being hardcoded per-file, since it's the only place `esphome.<device>_*`
+service names get built.
 
-1. **Scan coordinator** — trigger `esphome.rubiks_face_ready` → 300ms delay →
-   `rubiks.robot_scan_face {face}` → `esphome.rubiks_solver_face_scan_done`.
-2. **Solve dispatcher** — trigger `esphome.rubiks_scan_complete` → `rubiks.solve`
-   (`response_variable`) → `esphome.rubiks_solver_execute_solution` (`response_variable`).
-3. **Solve-done notification** — trigger `esphome.rubiks_solve_done` → log/notify.
-4. **Robot Start Scan** — trigger `rubiks_robot_start_requested` → `esphome.rubiks_solver_start_scan`.
-5. **Robot Stop** — trigger `rubiks_robot_stop_requested` → `esphome.rubiks_solver_stop`.
-6. **Robot Advance Face** — trigger `rubiks_robot_advance_face_requested` → `esphome.rubiks_solver_face_scan_done`.
+`async_setup_robot_bridge()` registers one `hass.bus.async_listen()` per event, torn
+down automatically via `entry.async_on_unload()`:
+
+1. **Scan coordinator** — `esphome.rubiks_face_ready` → 300ms settle delay →
+   `rubiks.robot_scan_face {face}` → `esphome.<device>_face_scan_done`. Guarded by an
+   `asyncio.Lock` so an overlapping event is silently dropped rather than run
+   concurrently (mirrors the old automation's `mode: single` / `max_exceeded: silent`).
+2. **Solve dispatcher** — `esphome.rubiks_scan_complete` → 1500ms settle delay → LED
+   off → `rubiks.solve` (response) → `esphome.<device>_execute_solution`. Same
+   single-at-a-time guard as above.
+3. **Solve-done notification** — `esphome.rubiks_solve_done` → LED off (safety net for
+   a directly-triggered solve with no preceding scan) → log.
+4. **Robot Start Scan** — `rubiks_robot_start_requested` → `esphome.<device>_start_scan`.
+5. **Robot Stop** — `rubiks_robot_stop_requested` → `esphome.<device>_stop`.
+6. **Robot Advance Face** — `rubiks_robot_advance_face_requested` → `esphome.<device>_face_scan_done`.
+7. **Scramble** — `rubiks_scramble_requested {solution}` → `esphome.<device>_execute_solution`
+   (same pipeline/guards as a real solve).
+
+The LED turned off in steps 2/3 is always the onboard ESP32-S3-CAM flash LED
+(`light.<device>_flash_led`, same device-name prefix as the actions above) — not the
+separately-configurable LED Entity ID option, which is for the illumination light used
+during scanning and may point elsewhere.
 
 The `solver_status` text sensor drives the TM1638 display and RTTTL beeps for dashboard
 feedback but plays no role in control flow — that's actions/events only.

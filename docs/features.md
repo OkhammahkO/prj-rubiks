@@ -98,9 +98,10 @@ longest step duration to avoid mid-travel dropout).
 `start_scan()`/`advance_scan()` plan each face's moves (`SCAN_FACES = {"W","B","Y","G","R","O"}`,
 matching `SCAN_SEQUENCE`), fire `esphome.rubiks_face_ready` per face, and after all 6,
 run a `flip → spin_home → flip` return-to-start sequence (no `rotate`, so no D-layer
-side effect) before firing `esphome.rubiks_scan_complete`. HA automation
-(`ha_automations/rubiks_robot.yaml`) bridges `rubiks_face_ready` → `rubiks.robot_scan_face`
-→ `face_scan_done`, and `rubiks_scan_complete` → `rubiks.solve` → `execute_solution`.
+side effect) before firing `esphome.rubiks_scan_complete`. The robot bridge
+(`custom_components/rubiks/robot_bridge.py`) relays `rubiks_face_ready` →
+`rubiks.robot_scan_face` → `face_scan_done`, and `rubiks_scan_complete` →
+`rubiks.solve` → `execute_solution`.
 
 ### Solve flow
 
@@ -199,9 +200,9 @@ same as a real solve.
   patterns).
 - **Entity**: `ScrambleButton` (`button.py`) generates the string in `async_press()` and
   fires `rubiks_scramble_requested` with `{solution}` as event data — same decoupling
-  convention as `RobotStartScanButton`/etc. Automation 7
-  (`ha_automations/rubiks_robot.yaml`) relays it to
-  `esphome.rubiks_solver_execute_solution`.
+  convention as `RobotStartScanButton`/etc. The robot bridge
+  (`custom_components/rubiks/robot_bridge.py`) relays it to
+  `esphome.<device>_execute_solution`.
 - Tests: `tests/test_button.py`.
 
 **Not built — kociemba-compression option**, if scramble statistical quality ever

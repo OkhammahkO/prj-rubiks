@@ -27,7 +27,9 @@ from .const import (
     CONF_CAMERA_ENTITY,
     CONF_SAMPLE_IMAGE,
     CONF_SOURCE,
+    DEFAULT_ESPHOME_DEVICE_NAME,
     DOMAIN,
+    ESPHOME_DEVICE_NAME,
     LED_ENTITY_ID,
     SOURCE_CAMERA,
     SOURCE_SAMPLE,
@@ -159,6 +161,13 @@ class RubiksOptionsFlow(OptionsFlow):
             if not errors:
                 return self.async_create_entry(data=user_input)
 
+        current_device_name = self.config_entry.options.get(
+            ESPHOME_DEVICE_NAME,
+            self.config_entry.data.get(
+                ESPHOME_DEVICE_NAME, DEFAULT_ESPHOME_DEVICE_NAME
+            ),
+        )
+
         if source == SOURCE_CAMERA:
             current_cam = self.config_entry.options.get(
                 CONF_CAMERA_ENTITY,
@@ -176,6 +185,9 @@ class RubiksOptionsFlow(OptionsFlow):
                     vol.Optional(
                         LED_ENTITY_ID, default=current_led or ""
                     ): EntitySelector(EntitySelectorConfig(domain="light")),
+                    vol.Required(
+                        ESPHOME_DEVICE_NAME, default=current_device_name
+                    ): TextSelector(),
                 }
             )
         else:
@@ -184,7 +196,12 @@ class RubiksOptionsFlow(OptionsFlow):
                 self.config_entry.data.get(CONF_SAMPLE_IMAGE),
             )
             schema = vol.Schema(
-                {vol.Required(CONF_SAMPLE_IMAGE, default=current): TextSelector()}
+                {
+                    vol.Required(CONF_SAMPLE_IMAGE, default=current): TextSelector(),
+                    vol.Required(
+                        ESPHOME_DEVICE_NAME, default=current_device_name
+                    ): TextSelector(),
+                }
             )
 
         return self.async_show_form(
