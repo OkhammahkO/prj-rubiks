@@ -88,11 +88,6 @@ DEFAULT_ESPHOME_DEVICE_NAME = "rubiks_solver"
 # Scramble number entity key
 SCRAMBLE_MOVE_COUNT = "scramble_move_count"
 
-# Faces/modifiers for scramble generation — plain random moves (not WCA random-state).
-# 26 is the researched minimum for a random-move sequence to be well-mixed (see
-# docs/features.md "Scrambler"); default sits right at that threshold.
-SCRAMBLE_FACES = ["U", "D", "L", "R", "F", "B"]
-SCRAMBLE_MODIFIERS = ["1", "2", "3"]
 SCRAMBLE_MOVE_COUNT_DEFAULT = 26
 SCRAMBLE_MOVE_COUNT_MIN = 15
 SCRAMBLE_MOVE_COUNT_MAX = 50

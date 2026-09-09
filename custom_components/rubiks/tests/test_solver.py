@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +15,32 @@ from custom_components.rubiks.solver import (
     kociemba_string,
     solve,
 )
+
+
+@contextmanager
+def _patched_twophase(fake_solver: MagicMock):
+    """Patching dict(sys.modules, {"twophase.solver": ...}) alone isn't enough once
+    `twophase` has genuinely been imported elsewhere in the test session (e.g. by
+    efficient_scramble.py's tests, which really import twophase.cubie/enums): Python's
+    `import twophase.solver as x` resolves via the `solver` *attribute* on the already-
+    cached `twophase` package object, not a fresh sys.modules lookup, so a real prior
+    import leaves that attribute stale even after this patch. Patching both makes this
+    robust regardless of what else in the suite has touched twophase, and regardless of
+    test collection order.
+    """
+    import twophase  # noqa: PLC0415
+
+    fake_defs = SimpleNamespace(FOLDER="")
+    with (
+        patch.dict(
+            sys.modules,
+            {"twophase.defs": fake_defs, "twophase.solver": fake_solver},
+        ),
+        patch.object(twophase, "defs", fake_defs, create=True),
+        patch.object(twophase, "solver", fake_solver, create=True),
+    ):
+        yield
+
 
 _SOLVED_CUBE = "U" * 9 + "R" * 9 + "F" * 9 + "D" * 9 + "L" * 9 + "B" * 9
 # Not a physically valid cube, just non-uniform per face — enough to skip _is_solved()'s
@@ -211,13 +238,7 @@ class TestSolve:
         """twophase's trailing '(Nf)' annotation is stripped from a successful solve."""
         fake_solver = MagicMock()
         fake_solver.solve.return_value = "U1 R3 F2 (3f)"
-        with patch.dict(
-            sys.modules,
-            {
-                "twophase.defs": SimpleNamespace(FOLDER=""),
-                "twophase.solver": fake_solver,
-            },
-        ):
+        with _patched_twophase(fake_solver):
             result = solve(_SCRAMBLED_CUBE)
         assert result == "U1 R3 F2"
 
@@ -225,12 +246,6 @@ class TestSolve:
         """A twophase error string (not an exception) is treated as a failure."""
         fake_solver = MagicMock()
         fake_solver.solve.return_value = "Error: Wrong edge and corner parity"
-        with patch.dict(
-            sys.modules,
-            {
-                "twophase.defs": SimpleNamespace(FOLDER=""),
-                "twophase.solver": fake_solver,
-            },
-        ):
+        with _patched_twophase(fake_solver):
             result = solve(_SCRAMBLED_CUBE)
         assert result is None

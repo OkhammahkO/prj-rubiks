@@ -183,37 +183,56 @@ moving servos), demo/fun modes (scramble-solve loop, speed leaderboard). True
 standalone-without-HA operation isn't planned — the TM1638 button actions route
 through HA, they don't bypass it.
 
-#### Scrambler — implemented (plain random-move version)
+**Live-updating cube state diagram** — have `CubeStateSensor`'s emoji cube net
+(`sensor.py`'s `_cube_net()`) update move-by-move as a solve executes, instead of only
+showing the static post-scan snapshot it does today (refreshed once on
+`rubiks_calibrated`). The per-move facelet transform is essentially free — `twophase`
+(already a dependency) applies one move via `FaceCube.from_string()` →
+`.to_cubie_cube()` → `.multiply(basicMoveCube[Color.U/R/F/D/L/B])` →
+`.to_facelet_cube().to_string()`, no hand-written permutation tables needed. The real
+cost is ESP32-side: firmware only tracks progress in robot-primitive units
+(flip/spin/rotate, via `moves_remaining`/`mark_action_boundary_()`) — there's no signal
+today for "which original solve move just finished." Needs a second, coarser boundary
+tracker (one entry per kociemba move, not per robot action) plus a new HA event fired
+per completion, mirroring the existing `moves_remaining` pattern — an area
+`docs/tm1638.md`'s "Fixed bug" note shows is easy to get subtly wrong. Same caveat as
+`believed_home`: with no physical position feedback anywhere in this project, the
+diagram would show the *intended* state assuming perfect execution, not a verified one.
+
+#### Scrambler — implemented (robot-efficient version)
 
 No firmware changes — reuses `execute_solution()` entirely, so every existing guard
 (`state_ == IDLE`, `needs_confirm_before_move_`, `believed_home_`) applies automatically,
 same as a real solve.
 
-- **Generator**: `generate_scramble()` (`button.py`) — picks N random moves from
-  `{U,D,L,R,F,B} × {1,2,3}` (digit-suffixed form, what `normalize_solution()` already
-  accepts), filtered to never repeat the same face on consecutive moves. Plain
-  random-move scrambling, not WCA's random-state method — see "kociemba-compression"
-  below for the more statistically rigorous option, not built.
+- **Generator**: `generate_efficient_scramble()` (`efficient_scramble.py`) — unlike a
+  plain random-move scramble (picking faces uniformly at random), this biases each pick
+  toward whichever face is currently reachable *without* a flip. Each kociemba notation
+  move translates to 2-7 physical robot actions depending on which face is currently
+  reachable (a Python port of `moves.h`'s translation table, `ROBOT_MOVES_TABLE`, scores
+  each candidate); picking randomly wastes most of a scramble's cost on faces that
+  happen to need reorienting first. Cuts the average robot-action count by roughly a
+  third versus the old plain-random generator, at the same scramble length. Still never
+  repeats the same face on consecutive moves (same rule the old generator used — avoids
+  wasteful runs like six `R1`'s in place of one `R2`).
+- **Hardness verification**: every candidate is applied to a solved cube (via
+  `twophase`'s own verified move algebra — `CubieCube`/`basicMoveCube`, not a hand-rolled
+  permutation table) and run through the real solver (`solver.solve()`) before being
+  accepted, rejecting anything that solves in fewer than `MIN_SOLUTION_LENGTH` (17)
+  moves — a cheap, biased generator must never also produce an under-scrambled cube.
+  Resolves in 1-5 attempts in practice (capped at `MAX_ATTEMPTS`), so it's cheap enough
+  to run synchronously via `hass.async_add_executor_job`, same as this integration's
+  other CPU-bound work (`calibrate_faces`, `detect_face_colors`).
 - **Move count**: `Scramble Move Count` number entity (`number.py`), range 15-50,
-  default **26** — the researched minimum for a random-move sequence to be reasonably
-  well-mixed (below that, sequences tend to leave recognisable partially-solved
-  patterns).
+  default **26** — works at any configured length, since the generator/verifier don't
+  assume a fixed count.
 - **Entity**: `ScrambleButton` (`button.py`) generates the string in `async_press()` and
   fires `rubiks_scramble_requested` with `{solution}` as event data — same decoupling
   convention as `RobotStartScanButton`/etc. The robot bridge
   (`custom_components/rubiks/robot_bridge.py`) relays it to
   `esphome.<device>_execute_solution`.
-- Tests: `tests/test_button.py`.
-
-**Not built — kociemba-compression option**, if scramble statistical quality ever
-matters more than it does now: simulate a long (60-100) random-move sequence against a
-virtual cube state, run *that* through the existing kociemba solver, and use the
-*inverse* of its solution (reversed order, each move's direction flipped: 1↔3, 2
-unchanged) as the actual scramble. Gets proper random-state-equivalent mixing with a
-comparable-or-shorter physical move count, at the cost of needing a new facelet-move
-simulator (apply one move to a 54-character cube string, all 18 move types) — a
-correctness-sensitive addition (a wrong permutation index is a *silent* bug, not an
-obvious one) that would need real unit tests, not just implementation.
+- Tests: `tests/test_button.py` (real, unmocked — correctness here depends on the
+  actual `twophase` solver's difficulty verification).
 
 **Lowest priority — code health, no behavior change**: split `button.py` into
 `scan_pipeline.py` (shared async helpers) + a thinned `button.py` (just entity

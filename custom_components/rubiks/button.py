@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import random
 import time
 from typing import TYPE_CHECKING
 
@@ -38,11 +37,10 @@ from .const import (
     DOMAIN,
     INTEGRATION_VERSION,
     SCAN_SEQUENCE,
-    SCRAMBLE_FACES,
-    SCRAMBLE_MODIFIERS,
     SCRAMBLE_MOVE_COUNT_DEFAULT,
     SOURCE_CAMERA,
 )
+from .efficient_scramble import generate_efficient_scramble
 from .solver import (
     ROBOT_CAMERA_TO_KOCIEMBA_REMAP,
     build_kociemba_faces,
@@ -124,28 +122,6 @@ async def async_setup_entry(
 
 
 # ── Module-level helpers (shared by button entities and service handler) ──────
-
-
-def generate_scramble(move_count: int) -> str:
-    """Generate a random scramble string, e.g. "U1 R2 F3 D1 ...".
-
-    Plain random-move scrambling, not WCA's random-state method — picks a random face
-    each step (never the same face twice in a row, to avoid the most obviously
-    redundant/cancelling sequences) and a random modifier (1=CW, 2=180°, 3=CCW). Digit
-    form matches what execute_solution()'s normalize_solution() already accepts
-    directly, same notation the D1/U1/etc test buttons use.
-
-    move_count should be at least ~26 for the sequence to be reasonably well-mixed —
-    below that, research shows random-move scrambles tend to leave recognisable
-    partially-solved patterns. See docs/features.md "Scrambler".
-    """
-    moves: list[str] = []
-    last_face: str | None = None
-    for _ in range(move_count):
-        face = random.choice([f for f in SCRAMBLE_FACES if f != last_face])
-        moves.append(face + random.choice(SCRAMBLE_MODIFIERS))
-        last_face = face
-    return " ".join(moves)
 
 
 async def _async_illuminate(hass: HomeAssistant, data: dict) -> None:
@@ -808,7 +784,7 @@ class RobotAdvanceFaceButton(RubiksButtonBase):
 
 
 class ScrambleButton(RubiksButtonBase):
-    """Generate a random scramble and send it to the robot to execute.
+    """Generate a robot-efficient scramble and send it to the robot to execute.
 
     Reuses execute_solution() entirely — no firmware changes. Every existing guard
     (state_ == IDLE, needs_confirm_before_move_, believed_home_) applies automatically,
@@ -826,6 +802,8 @@ class ScrambleButton(RubiksButtonBase):
         move_count = (
             count_entity.move_count if count_entity else SCRAMBLE_MOVE_COUNT_DEFAULT
         )
-        scramble = generate_scramble(move_count)
+        scramble = await self.hass.async_add_executor_job(
+            generate_efficient_scramble, move_count
+        )
         self.hass.bus.async_fire(f"{DOMAIN}_scramble_requested", {"solution": scramble})
         _LOGGER.info("Scramble requested: %s (%d moves)", scramble, move_count)
